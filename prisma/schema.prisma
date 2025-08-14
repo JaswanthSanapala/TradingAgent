@@ -1,0 +1,297 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+// Looking for ways to speed up your queries, or scale easily with your serverless or edge functions?
+// Try Prisma Accelerate: https://pris.ly/cli/accelerate-init
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id        String   @id @default(cuid())
+  email     String   @unique
+  name      String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Relations
+  strategies  Strategy[]
+  agents      Agent[]
+  trades      Trade[]
+  analyses    Analysis[]
+}
+
+model Strategy {
+  id          String   @id @default(cuid())
+  name        String
+  description String?
+  parameters  Json?
+  isActive    Boolean  @default(true)
+  userId      String
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  // Relations
+  user   User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  agents Agent[]
+  trades Trade[]
+  backtests Backtest[]
+}
+
+model Agent {
+  id           String   @id @default(cuid())
+  name         String
+  algorithm    String   // 'ppo', 'a2c', 'dqn', 'sac', etc.
+  version      Int      @default(1)
+  parameters   Json?
+  performance  Json?
+  modelPath    String?
+  strategyId   String
+  userId       String
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  // Relations
+  user        User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  strategy    Strategy   @relation(fields: [strategyId], references: [id], onDelete: Cascade)
+  trades      Trade[]
+  backtests   Backtest[]
+  lossAnalyses LossAnalysis[]
+  trainingResults TrainingResult[]
+  aiLearningData AILearningData[]
+}
+
+model TrainingResult {
+  id          String   @id @default(cuid())
+  agentId     String
+  episode     Int
+  totalReward Float
+  steps       Int
+  winRate     Float
+  sharpeRatio Float
+  maxDrawdown Float
+  parameters  Json?
+  metrics     Json?
+  createdAt   DateTime @default(now())
+
+  // Relations
+  agent Agent @relation(fields: [agentId], references: [id], onDelete: Cascade)
+}
+
+model LossAnalysis {
+  id              String   @id @default(cuid())
+  agentId         String
+  tradeId         String
+  lossAmount      Float
+  lossReason      String
+  marketConditions Json?
+  agentDecision   Json?
+  timestamp       DateTime @default(now())
+  severity        LossSeverity @default(medium) // low, medium, high
+  category        String   // 'stop_loss', 'market_timing', 'position_sizing', etc.
+  createdAt       DateTime @default(now())
+
+  // Relations
+  agent Agent @relation(fields: [agentId], references: [id], onDelete: Cascade)
+}
+
+model NewsArticle {
+  id          String   @id @default(cuid())
+  title       String
+  content     String?
+  source      String?
+  publishedAt DateTime @default(now())
+  sentiment   Float?   // -1 to 1, negative to positive
+  category    String?
+  symbols     String? // Comma-separated trading symbols this article affects
+  createdAt   DateTime @default(now())
+
+  // Relations
+  marketData MarketData[]
+}
+
+model MarketData {
+  id        String   @id @default(cuid())
+  timestamp DateTime
+  symbol    String
+  timeframe String   // '1m', '5m', '15m', '1h', '4h', '1d'
+  open      Float
+  high      Float
+  low       Float
+  close     Float
+  volume    Float
+  createdAt DateTime @default(now())
+
+  @@unique([timestamp, symbol, timeframe])
+
+  // Relations
+  indicators Indicator[]
+  newsArticles NewsArticle[]
+}
+
+model Indicator {
+  id                String   @id @default(cuid())
+  timestamp         DateTime
+  symbol            String
+  timeframe         String
+  atr               Float?
+  cci               Float?
+  rsi               Float?
+  macd              Float?
+  macdSignal        Float?
+  macdHistogram     Float?
+  bbUpper           Float?
+  bbMiddle          Float?
+  bbLower           Float?
+  swingHigh         Float?
+  swingLow          Float?
+  bullishEngulfing   Boolean? @default(false)
+  bearishEngulfing   Boolean? @default(false)
+  doji              Boolean? @default(false)
+  sma20             Float?
+  sma50             Float?
+  createdAt         DateTime @default(now())
+
+  // Relations
+  marketData MarketData @relation(fields: [timestamp, symbol, timeframe], references: [timestamp, symbol, timeframe])
+}
+
+model ApiConfiguration {
+  id          String   @id @default(cuid())
+  provider    String   // 'binance', 'coinbase', etc.
+  apiKey      String?
+  apiSecret   String?
+  sandbox     Boolean  @default(true)
+  rateLimit   Int      @default(1000)
+  isActive    Boolean  @default(true)
+  settings    Json?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+model Trade {
+  id           String   @id @default(cuid())
+  agentId      String
+  strategyId   String
+  backtestId   String?
+  entryTime    DateTime
+  exitTime     DateTime?
+  entryPrice   Float
+  exitPrice    Float?
+  stopLoss     Float
+  takeProfit   Float
+  positionSize Float
+  action       TradeAction // buy, sell
+  pnl          Float?
+  pnlPercent   Float?
+  status       TradeStatus @default(open) // open, closed, stopped_out, take_profit
+  userId       String?
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  // Relations
+  agent    Agent     @relation(fields: [agentId], references: [id], onDelete: Cascade)
+  strategy Strategy  @relation(fields: [strategyId], references: [id], onDelete: Cascade)
+  backtest Backtest? @relation(fields: [backtestId], references: [id], onDelete: Cascade)
+  user     User?     @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model Backtest {
+  id                  String   @id @default(cuid())
+  agentId             String
+  strategyId          String
+  startDate           DateTime
+  endDate             DateTime
+  symbol              String
+  initialBalance      Float
+  finalBalance        Float
+  totalTrades         Int
+  winningTrades       Int
+  losingTrades        Int
+  winRate             Float
+  totalPnl            Float
+  maxDrawdown         Float
+  sharpeRatio         Float
+  profitFactor        Float
+  avgWin              Float
+  avgLoss             Float
+  monthlyPerformance  Json?
+  riskMetrics         Json?
+  tradeDistribution   Json?
+  enhancedMetrics     Json?
+  status              BacktestStatus @default(pending) // pending, running, completed, failed
+  createdAt           DateTime @default(now())
+  updatedAt           DateTime @updatedAt
+
+  // Relations
+  agent    Agent    @relation(fields: [agentId], references: [id], onDelete: Cascade)
+  strategy Strategy @relation(fields: [strategyId], references: [id], onDelete: Cascade)
+  trades   Trade[]
+}
+
+model Analysis {
+  id          String   @id @default(cuid())
+  userId      String
+  title       String
+  description String?
+  type        AnalysisType // technical, fundamental, sentiment, risk
+  data        Json?
+  insights    Json?
+  recommendations Json?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  // Relations
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model AILearningData {
+  id         String   @id @default(cuid())
+  agentId    String
+  learningType String // 'loss_analysis', 'pattern_recognition', 'optimization', etc.
+  inputData  Json?
+  outputData Json?
+  timestamp  DateTime @default(now())
+  createdAt  DateTime @default(now())
+
+  // Relations
+  agent Agent @relation(fields: [agentId], references: [id], onDelete: Cascade)
+}
+
+enum TradeAction {
+  buy
+  sell
+}
+
+enum TradeStatus {
+  open
+  closed
+  stopped_out
+  take_profit
+}
+
+enum LossSeverity {
+  low
+  medium
+  high
+}
+
+enum AnalysisType {
+  technical
+  fundamental
+  sentiment
+  risk
+}
+
+enum BacktestStatus {
+  pending
+  running
+  completed
+  failed
+}
