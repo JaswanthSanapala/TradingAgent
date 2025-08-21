@@ -1,6 +1,7 @@
 import { prisma } from '@/lib/db';
 import { createLogger } from '@/lib/logger';
 import { DataPipeline, DataPipelineConfig } from '@/lib/data-pipeline';
+import { CONFIG } from '@/lib/config';
 
 const log = createLogger('Scheduler');
 
@@ -17,15 +18,15 @@ export class CoverageScheduler {
   private constructor(cfg?: Partial<DataPipelineConfig>) {
     const pipelineCfg: DataPipelineConfig = {
       exchange: {
-        id: cfg?.exchange?.id || 'binance',
-        apiKey: cfg?.exchange?.apiKey,
-        secret: cfg?.exchange?.secret,
-        sandbox: cfg?.exchange?.sandbox ?? false,
+        id: cfg?.exchange?.id || CONFIG.EXCHANGE_ID,
+        apiKey: cfg?.exchange?.apiKey ?? CONFIG.EXCHANGE_API_KEY,
+        secret: cfg?.exchange?.secret ?? CONFIG.EXCHANGE_SECRET,
+        sandbox: cfg?.exchange?.sandbox ?? CONFIG.EXCHANGE_SANDBOX,
       },
-      timeframes: cfg?.timeframes || { '1m': '1m', '5m': '5m', '1h': '1h', '4h': '4h', '1d': '1d' },
+      timeframes: cfg?.timeframes || CONFIG.TIMEFRAMES,
       indicators: cfg?.indicators || { atrPeriod: 14, cciPeriod: 20, smaPeriods: [20, 50], rsiPeriod: 14 },
       database: cfg?.database || { path: './db/custom.db', backupEnabled: false, cleanupDays: 0 },
-      symbols: cfg?.symbols || ['BTC_USDT'],
+      symbols: cfg?.symbols || CONFIG.SYMBOLS,
     };
     this.pipeline = new DataPipeline(pipelineCfg);
   }
@@ -35,7 +36,7 @@ export class CoverageScheduler {
     return this._instance;
   }
 
-  start(intervalMs: number = DEFAULT_TICK_MS) {
+  start(intervalMs: number = (CONFIG.SCHEDULER_TICK_MS || DEFAULT_TICK_MS)) {
     if (this.timer) return;
     log.info(`Starting scheduler with tick=${intervalMs}ms`);
     this.timer = setInterval(() => this.tick().catch(e => log.error('Tick error', e)), intervalMs);

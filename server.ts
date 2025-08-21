@@ -1,14 +1,15 @@
 // server.ts - Next.js Standalone + Socket.IO
 import 'dotenv/config';
 import { setupSocket } from '@/lib/socket';
+import { CONFIG } from '@/lib/config';
 import { createServer } from 'http';
 import { Server } from 'socket.io';
 import next from 'next';
 import { startScheduler } from '@/lib/scheduler';
 
 const dev = process.env.NODE_ENV !== 'production';
-const currentPort = 3000;
-const hostname = '0.0.0.0';
+const currentPort = CONFIG.PORT;
+const hostname = CONFIG.HOSTNAME;
 
 // Custom server with Socket.IO integration
 async function createCustomServer() {
@@ -49,7 +50,7 @@ async function createCustomServer() {
       console.log(`> Ready on http://${hostname}:${currentPort}`);
       console.log(`> Socket.IO server running at ws://${hostname}:${currentPort}/api/socketio`);
       // Start coverage scheduler once server is ready (unless disabled)
-      const enabled = (process.env.SCHEDULER_ENABLED ?? 'true').toLowerCase() !== 'false';
+      const enabled = CONFIG.SCHEDULER_ENABLED;
       if (enabled) {
         startScheduler();
         console.log('> Coverage scheduler: ENABLED');

@@ -15,7 +15,8 @@ export const POST = async (request: NextRequest) => {
     }
 
     const backtestEngine = new BacktestEngine({} as any);
-    const comparison = await backtestEngine.compareBacktests(backtestIds);
+    const ids: string[] = backtestIds.map((id: any) => String(id));
+    const comparison = await backtestEngine.compareBacktests(ids);
 
     return NextResponse.json({
       success: true,

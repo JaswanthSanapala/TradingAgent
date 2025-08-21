@@ -5,6 +5,7 @@ export interface BacktestConfig {
   startDate: Date;
   endDate: Date;
   symbol: string;
+  timeframe?: string; // optional timeframe like '1h', '1d'
   initialBalance: number;
   maxRiskPerTrade: number;
   maxTradesPerDay: number;
@@ -116,6 +117,7 @@ export class BacktestEngine {
       return await prisma.marketData.findMany({
         where: {
           symbol: this.config.symbol,
+          ...(this.config.timeframe ? { timeframe: this.config.timeframe } : {}),
           timestamp: {
             gte: this.config.startDate,
             lte: this.config.endDate,
@@ -280,6 +282,7 @@ export class BacktestEngine {
       const recentData = await prisma.marketData.findMany({
         where: {
           symbol: this.config.symbol,
+          ...(this.config.timeframe ? { timeframe: this.config.timeframe } : {}),
         },
         orderBy: {
           timestamp: 'desc',
@@ -335,7 +338,7 @@ export class BacktestEngine {
     }
   }
 
-  private async closeTrade(trade: Trade, exitTime: Date, exitPrice: number, status: string): Promise<void> {
+  private async closeTrade(trade: Trade, exitTime: Date, exitPrice: number, status: Trade['status']): Promise<void> {
     trade.exitTime = exitTime;
     trade.exitPrice = exitPrice;
     trade.status = status;
@@ -395,7 +398,7 @@ export class BacktestEngine {
     }
 
     // Calculate Sharpe ratio (simplified)
-    const returns = [];
+    const returns: number[] = [];
     for (let i = 1; i < this.equityCurve.length; i++) {
       const prevBalance = this.equityCurve[i - 1].balance;
       const currBalance = this.equityCurve[i].balance;
@@ -403,8 +406,10 @@ export class BacktestEngine {
       returns.push(ret);
     }
 
-    const avgReturn = returns.reduce((sum, ret) => sum + ret, 0) / returns.length;
-    const stdReturn = Math.sqrt(returns.reduce((sum, ret) => sum + Math.pow(ret - avgReturn, 2), 0) / returns.length);
+    const avgReturn = returns.length > 0 ? returns.reduce((sum, ret) => sum + ret, 0) / returns.length : 0;
+    const stdReturn = returns.length > 0
+      ? Math.sqrt(returns.reduce((sum, ret) => sum + Math.pow(ret - avgReturn, 2), 0) / returns.length)
+      : 0;
     const sharpeRatio = stdReturn > 0 ? avgReturn / stdReturn : 0;
 
     // Calculate profit factor
@@ -617,7 +622,7 @@ export class BacktestEngine {
     return enhanced;
   }
 
-  private async saveBacktestResults(agentId: string, strategyId: string, results: BacktestResult): Promise<number> {
+  private async saveBacktestResults(agentId: string, strategyId: string, results: BacktestResult): Promise<string> {
     try {
       const backtest = await prisma.backtest.create({
         data: {
@@ -700,7 +705,7 @@ export class BacktestEngine {
     }
   }
 
-  async compareBacktests(backtestIds: number[]): Promise<any> {
+  async compareBacktests(backtestIds: string[]): Promise<any> {
     try {
       const backtests = await prisma.backtest.findMany({
         where: {
@@ -722,12 +727,15 @@ export class BacktestEngine {
       };
     } catch (error) {
       logger.error('Error comparing backtests:', error);
-      return { success: false, error: error.message };
+      const message = error instanceof Error ? error.message : String(error);
+      return { success: false, error: message };
     }
   }
 
   private generateComparisonAnalysis(backtests: any[]): any {
-    const analysis = {
+    type Best = { id: string; agentName: string; sharpeRatio: number; totalPnl: number; winRate: number } | null;
+    type MetricsSummary = { min: number; max: number; avg: number; bestBacktest: string };
+    const analysis: { bestPerformer: Best; metricsComparison: Record<string, MetricsSummary>; recommendations: string[] } = {
       bestPerformer: null,
       metricsComparison: {},
       recommendations: [],
@@ -735,7 +743,7 @@ export class BacktestEngine {
 
     // Find best performer by Sharpe ratio
     let bestSharpe = -Infinity;
-    let bestBacktest = null;
+    let bestBacktest: any | null = null;
 
     for (const backtest of backtests) {
       if (backtest.sharpeRatio > bestSharpe) {
@@ -755,10 +763,10 @@ export class BacktestEngine {
     }
 
     // Compare key metrics
-    const metrics = ['totalPnl', 'winRate', 'sharpeRatio', 'maxDrawdown', 'profitFactor'];
+    const metrics: Array<'totalPnl' | 'winRate' | 'sharpeRatio' | 'maxDrawdown' | 'profitFactor'> = ['totalPnl', 'winRate', 'sharpeRatio', 'maxDrawdown', 'profitFactor'];
 
     for (const metric of metrics) {
-      const values = backtests.map(b => b[metric]).filter(v => v !== null && v !== undefined);
+      const values = backtests.map(b => b[metric] as number).filter(v => v !== null && v !== undefined) as number[];
       if (values.length > 0) {
         analysis.metricsComparison[metric] = {
           min: Math.min(...values),

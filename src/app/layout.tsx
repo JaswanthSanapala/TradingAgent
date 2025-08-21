@@ -21,7 +21,7 @@ export const metadata: Metadata = {
   openGraph: {
     title: "AI Trading Platform",
     description: "A platform for building, testing, and deploying AI-powered trading agents.",
-    url: "https://your-domain.com",
+    url: process.env.NEXT_PUBLIC_SITE_URL || "http://localhost:3000",
     siteName: "AI Trading Platform",
     type: "website",
   },

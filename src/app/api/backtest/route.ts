@@ -57,6 +57,7 @@ export const POST = async (request: NextRequest) => {
       startDate: new Date(config?.startDate || Date.now() - 90 * 24 * 60 * 60 * 1000),
       endDate: new Date(config?.endDate || Date.now()),
       symbol: config?.symbol || 'EUR/USD',
+      timeframe: config?.timeframe,
       initialBalance: config?.initialBalance || 10000,
       maxRiskPerTrade: config?.maxRiskPerTrade || 0.01,
       maxTradesPerDay: config?.maxTradesPerDay || 2,

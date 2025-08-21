@@ -72,6 +72,16 @@ npm start
 
 Open [http://localhost:3000](http://localhost:3000) to see your application running.
 
+## 🔐 Environment Setup
+
+Sensitive links and credentials are loaded from environment variables.
+
+1) Copy `docs/ENV.example.md` values into a local `.env` file at the project root.
+2) Adjust values for your environment (e.g., `NEWS_FEEDS`, `EXCHANGE_*`, `NEXT_PUBLIC_*`).
+3) Restart the dev server after changes.
+
+Note: `.env*` is gitignored by default. Do not commit secrets.
+
 ## 🤖 Powered by Z.ai
 
 This scaffold is optimized for use with [Z.ai](https://chat.z.ai) - your AI assistant for:
