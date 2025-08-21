@@ -21,10 +21,10 @@ model User {
   updatedAt DateTime @updatedAt
 
   // Relations
-  strategies  Strategy[]
-  agents      Agent[]
-  trades      Trade[]
-  analyses    Analysis[]
+  strategies Strategy[]
+  agents     Agent[]
+  trades     Trade[]
+  analyses   Analysis[]
 }
 
 model Strategy {
@@ -38,33 +38,39 @@ model Strategy {
   updatedAt   DateTime @updatedAt
 
   // Relations
-  user   User       @relation(fields: [userId], references: [id], onDelete: Cascade)
-  agents Agent[]
-  trades Trade[]
-  backtests Backtest[]
+  user             User              @relation(fields: [userId], references: [id], onDelete: Cascade)
+  agents           Agent[]
+  trades           Trade[]
+  backtests        Backtest[]
+  tradePredictions TradePrediction[]
 }
 
 model Agent {
-  id           String   @id @default(cuid())
-  name         String
-  algorithm    String   // 'ppo', 'a2c', 'dqn', 'sac', etc.
-  version      Int      @default(1)
-  parameters   Json?
-  performance  Json?
-  modelPath    String?
-  strategyId   String
-  userId       String
-  createdAt    DateTime @default(now())
-  updatedAt    DateTime @updatedAt
+  id          String   @id @default(cuid())
+  name        String
+  algorithm   String // 'ppo', 'a2c', 'dqn', 'sac', etc.
+  version     Int      @default(1)
+  parameters  Json?
+  performance Json?
+  modelPath   String?
+  strategyId  String
+  userId      String
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
 
   // Relations
-  user        User       @relation(fields: [userId], references: [id], onDelete: Cascade)
-  strategy    Strategy   @relation(fields: [strategyId], references: [id], onDelete: Cascade)
-  trades      Trade[]
-  backtests   Backtest[]
-  lossAnalyses LossAnalysis[]
-  trainingResults TrainingResult[]
-  aiLearningData AILearningData[]
+  user             User              @relation(fields: [userId], references: [id], onDelete: Cascade)
+  strategy         Strategy          @relation(fields: [strategyId], references: [id], onDelete: Cascade)
+  trades           Trade[]
+  backtests        Backtest[]
+  lossAnalyses     LossAnalysis[]
+  trainingResults  TrainingResult[]
+  aiLearningData   AILearningData[]
+  trainingRuns     TrainingRun[]
+  tradePredictions TradePrediction[]
+  feedbackEvents   FeedbackEvent[]
+
+  @@unique([strategyId])
 }
 
 model TrainingResult {
@@ -85,17 +91,17 @@ model TrainingResult {
 }
 
 model LossAnalysis {
-  id              String   @id @default(cuid())
-  agentId         String
-  tradeId         String
-  lossAmount      Float
-  lossReason      String
+  id               String       @id @default(cuid())
+  agentId          String
+  tradeId          String
+  lossAmount       Float
+  lossReason       String
   marketConditions Json?
-  agentDecision   Json?
-  timestamp       DateTime @default(now())
-  severity        LossSeverity @default(medium) // low, medium, high
-  category        String   // 'stop_loss', 'market_timing', 'position_sizing', etc.
-  createdAt       DateTime @default(now())
+  agentDecision    Json?
+  timestamp        DateTime     @default(now())
+  severity         LossSeverity @default(medium) // low, medium, high
+  category         String // 'stop_loss', 'market_timing', 'position_sizing', etc.
+  createdAt        DateTime     @default(now())
 
   // Relations
   agent Agent @relation(fields: [agentId], references: [id], onDelete: Cascade)
@@ -107,7 +113,7 @@ model NewsArticle {
   content     String?
   source      String?
   publishedAt DateTime @default(now())
-  sentiment   Float?   // -1 to 1, negative to positive
+  sentiment   Float? // -1 to 1, negative to positive
   category    String?
   symbols     String? // Comma-separated trading symbols this article affects
   createdAt   DateTime @default(now())
@@ -120,7 +126,7 @@ model MarketData {
   id        String   @id @default(cuid())
   timestamp DateTime
   symbol    String
-  timeframe String   // '1m', '5m', '15m', '1h', '4h', '1d'
+  timeframe String // '1m', '5m', '15m', '1h', '4h', '1d'
   open      Float
   high      Float
   low       Float
@@ -128,55 +134,55 @@ model MarketData {
   volume    Float
   createdAt DateTime @default(now())
 
-  @@unique([timestamp, symbol, timeframe])
-
   // Relations
-  indicators Indicator[]
+  indicators   Indicator[]
   newsArticles NewsArticle[]
+
+  @@unique([timestamp, symbol, timeframe])
 }
 
 model Indicator {
-  id                String   @id @default(cuid())
-  timestamp         DateTime
-  symbol            String
-  timeframe         String
-  atr               Float?
-  cci               Float?
-  rsi               Float?
-  macd              Float?
-  macdSignal        Float?
-  macdHistogram     Float?
-  bbUpper           Float?
-  bbMiddle          Float?
-  bbLower           Float?
-  swingHigh         Float?
-  swingLow          Float?
-  bullishEngulfing   Boolean? @default(false)
-  bearishEngulfing   Boolean? @default(false)
-  doji              Boolean? @default(false)
-  sma20             Float?
-  sma50             Float?
-  createdAt         DateTime @default(now())
+  id               String   @id @default(cuid())
+  timestamp        DateTime
+  symbol           String
+  timeframe        String
+  atr              Float?
+  cci              Float?
+  rsi              Float?
+  macd             Float?
+  macdSignal       Float?
+  macdHistogram    Float?
+  bbUpper          Float?
+  bbMiddle         Float?
+  bbLower          Float?
+  swingHigh        Float?
+  swingLow         Float?
+  bullishEngulfing Boolean? @default(false)
+  bearishEngulfing Boolean? @default(false)
+  doji             Boolean? @default(false)
+  sma20            Float?
+  sma50            Float?
+  createdAt        DateTime @default(now())
 
   // Relations
   marketData MarketData @relation(fields: [timestamp, symbol, timeframe], references: [timestamp, symbol, timeframe])
 }
 
 model ApiConfiguration {
-  id          String   @id @default(cuid())
-  provider    String   // 'binance', 'coinbase', etc.
-  apiKey      String?
-  apiSecret   String?
-  sandbox     Boolean  @default(true)
-  rateLimit   Int      @default(1000)
-  isActive    Boolean  @default(true)
-  settings    Json?
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  id        String   @id @default(cuid())
+  provider  String // 'binance', 'coinbase', etc.
+  apiKey    String?
+  apiSecret String?
+  sandbox   Boolean  @default(true)
+  rateLimit Int      @default(1000)
+  isActive  Boolean  @default(true)
+  settings  Json?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 }
 
 model Trade {
-  id           String   @id @default(cuid())
+  id           String      @id @default(cuid())
   agentId      String
   strategyId   String
   backtestId   String?
@@ -192,42 +198,43 @@ model Trade {
   pnlPercent   Float?
   status       TradeStatus @default(open) // open, closed, stopped_out, take_profit
   userId       String?
-  createdAt    DateTime @default(now())
-  updatedAt    DateTime @updatedAt
+  createdAt    DateTime    @default(now())
+  updatedAt    DateTime    @updatedAt
 
   // Relations
-  agent    Agent     @relation(fields: [agentId], references: [id], onDelete: Cascade)
-  strategy Strategy  @relation(fields: [strategyId], references: [id], onDelete: Cascade)
-  backtest Backtest? @relation(fields: [backtestId], references: [id], onDelete: Cascade)
-  user     User?     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  agent          Agent           @relation(fields: [agentId], references: [id], onDelete: Cascade)
+  strategy       Strategy        @relation(fields: [strategyId], references: [id], onDelete: Cascade)
+  backtest       Backtest?       @relation(fields: [backtestId], references: [id], onDelete: Cascade)
+  user           User?           @relation(fields: [userId], references: [id], onDelete: Cascade)
+  feedbackEvents FeedbackEvent[] @relation("TradeFeedbacks")
 }
 
 model Backtest {
-  id                  String   @id @default(cuid())
-  agentId             String
-  strategyId          String
-  startDate           DateTime
-  endDate             DateTime
-  symbol              String
-  initialBalance      Float
-  finalBalance        Float
-  totalTrades         Int
-  winningTrades       Int
-  losingTrades        Int
-  winRate             Float
-  totalPnl            Float
-  maxDrawdown         Float
-  sharpeRatio         Float
-  profitFactor        Float
-  avgWin              Float
-  avgLoss             Float
-  monthlyPerformance  Json?
-  riskMetrics         Json?
-  tradeDistribution   Json?
-  enhancedMetrics     Json?
-  status              BacktestStatus @default(pending) // pending, running, completed, failed
-  createdAt           DateTime @default(now())
-  updatedAt           DateTime @updatedAt
+  id                 String         @id @default(cuid())
+  agentId            String
+  strategyId         String
+  startDate          DateTime
+  endDate            DateTime
+  symbol             String
+  initialBalance     Float
+  finalBalance       Float
+  totalTrades        Int
+  winningTrades      Int
+  losingTrades       Int
+  winRate            Float
+  totalPnl           Float
+  maxDrawdown        Float
+  sharpeRatio        Float
+  profitFactor       Float
+  avgWin             Float
+  avgLoss            Float
+  monthlyPerformance Json?
+  riskMetrics        Json?
+  tradeDistribution  Json?
+  enhancedMetrics    Json?
+  status             BacktestStatus @default(pending) // pending, running, completed, failed
+  createdAt          DateTime       @default(now())
+  updatedAt          DateTime       @updatedAt
 
   // Relations
   agent    Agent    @relation(fields: [agentId], references: [id], onDelete: Cascade)
@@ -236,32 +243,124 @@ model Backtest {
 }
 
 model Analysis {
-  id          String   @id @default(cuid())
-  userId      String
-  title       String
-  description String?
-  type        AnalysisType // technical, fundamental, sentiment, risk
-  data        Json?
-  insights    Json?
+  id              String       @id @default(cuid())
+  userId          String
+  title           String
+  description     String?
+  type            AnalysisType // technical, fundamental, sentiment, risk
+  data            Json?
+  insights        Json?
   recommendations Json?
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  createdAt       DateTime     @default(now())
+  updatedAt       DateTime     @updatedAt
 
   // Relations
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 }
 
 model AILearningData {
-  id         String   @id @default(cuid())
-  agentId    String
+  id           String   @id @default(cuid())
+  agentId      String
   learningType String // 'loss_analysis', 'pattern_recognition', 'optimization', etc.
-  inputData  Json?
-  outputData Json?
-  timestamp  DateTime @default(now())
-  createdAt  DateTime @default(now())
+  inputData    Json?
+  outputData   Json?
+  timestamp    DateTime @default(now())
+  createdAt    DateTime @default(now())
 
   // Relations
   agent Agent @relation(fields: [agentId], references: [id], onDelete: Cascade)
+}
+
+model CoverageManifest {
+  id            String         @id @default(cuid())
+  symbol        String
+  timeframe     String
+  exchangeId    String         @default("binance")
+  startDate     DateTime
+  endDate       DateTime
+  status        ManifestStatus @default(active)
+  lastCoveredTo DateTime?
+  notes         String?
+  createdAt     DateTime       @default(now())
+  updatedAt     DateTime       @updatedAt
+
+  // Relations
+  jobs IngestJob[]
+
+  @@unique([symbol, timeframe, exchangeId, startDate, endDate])
+}
+
+model IngestJob {
+  id         String    @id @default(cuid())
+  manifestId String
+  symbol     String
+  timeframe  String
+  exchangeId String
+  rangeStart DateTime
+  rangeEnd   DateTime
+  inserted   Int       @default(0)
+  status     JobStatus @default(pending)
+  error      String?
+  startedAt  DateTime?
+  finishedAt DateTime?
+  createdAt  DateTime  @default(now())
+  updatedAt  DateTime  @updatedAt
+
+  // Relations
+  manifest CoverageManifest @relation(fields: [manifestId], references: [id], onDelete: Cascade)
+}
+
+model TrainingRun {
+  id           String   @id @default(cuid())
+  agentId      String
+  runType      String // 'supervised' | 'rl'
+  params       Json?
+  metrics      Json?
+  artifactPath String?
+  status       String   @default("completed") // 'running' | 'completed' | 'failed'
+  createdAt    DateTime @default(now())
+
+  // Relations
+  agent Agent @relation(fields: [agentId], references: [id], onDelete: Cascade)
+}
+
+model TradePrediction {
+  id         String   @id @default(cuid())
+  agentId    String
+  strategyId String
+  symbol     String
+  timeframe  String
+  timestamp  DateTime
+  features   Json?
+  action     String // 'buy' | 'sell' | 'hold'
+  confidence Float
+  stopLoss   Float?
+  takeProfit Float?
+  meta       Json?
+  createdAt  DateTime @default(now())
+
+  // Relations
+  agent          Agent           @relation(fields: [agentId], references: [id], onDelete: Cascade)
+  strategy       Strategy        @relation(fields: [strategyId], references: [id], onDelete: Cascade)
+  feedbackEvents FeedbackEvent[] @relation("PredictionFeedbacks")
+
+  @@index([agentId, timestamp])
+  @@index([strategyId, timestamp])
+}
+
+model FeedbackEvent {
+  id           String   @id @default(cuid())
+  agentId      String
+  predictionId String?
+  tradeId      String?
+  outcome      Json? // { result: 'sl'|'tp'|'closed', pnl: number, pnlPct: number }
+  reason       String?
+  createdAt    DateTime @default(now())
+
+  // Relations
+  agent      Agent            @relation(fields: [agentId], references: [id], onDelete: Cascade)
+  prediction TradePrediction? @relation("PredictionFeedbacks", fields: [predictionId], references: [id])
+  trade      Trade?           @relation("TradeFeedbacks", fields: [tradeId], references: [id])
 }
 
 enum TradeAction {
@@ -290,6 +389,18 @@ enum AnalysisType {
 }
 
 enum BacktestStatus {
+  pending
+  running
+  completed
+  failed
+}
+
+enum ManifestStatus {
+  active
+  paused
+}
+
+enum JobStatus {
   pending
   running
   completed

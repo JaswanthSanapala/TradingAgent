@@ -1,12 +1,18 @@
 import { Server } from 'socket.io';
+import { socketBus, TRAIN_PROGRESS_EVENT, type TrainProgressEvent } from '@/lib/socket-bus';
 
 export const setupSocket = (io: Server) => {
+  // Relay training progress to all clients
+  socketBus.on(TRAIN_PROGRESS_EVENT, (payload) => {
+    io.emit('TRAIN_PROGRESS_EVENT', payload);
+  });
+
   io.on('connection', (socket) => {
     console.log('Client connected:', socket.id);
-    
+
     // Handle messages
     socket.on('message', (msg: { text: string; senderId: string }) => {
-      // Echo: broadcast message only the client who send the message
+      // Echo back to the sender
       socket.emit('message', {
         text: `Echo: ${msg.text}`,
         senderId: 'system',
@@ -14,16 +20,22 @@ export const setupSocket = (io: Server) => {
       });
     });
 
-    // Handle disconnect
     socket.on('disconnect', () => {
       console.log('Client disconnected:', socket.id);
     });
 
-    // Send welcome message
+    // Optional welcome
     socket.emit('message', {
-      text: 'Welcome to WebSocket Echo Server!',
+      text: 'Welcome to WebSocket Server!',
       senderId: 'system',
       timestamp: new Date().toISOString(),
+    });
+  });
+
+  io.engine.on('connection_close', () => {
+    // Clean up listeners if server restarts
+    socketBus.off(TRAIN_PROGRESS_EVENT, (payload) => {
+      io.emit('TRAIN_PROGRESS_EVENT', payload);
     });
   });
 };
