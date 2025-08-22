@@ -10,6 +10,7 @@ const pages = {
   brokers: dynamic(() => import("@/components/pages/brokers")),
   news: dynamic(() => import("@/components/pages/news")),
   "live-charts": dynamic(() => import("@/components/pages/live_charts")),
+  "trades-history": dynamic(() => import("@/components/pages/trades_history")),
 };
 
 type PageProps = {

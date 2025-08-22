@@ -19,3 +19,39 @@ export type TrainProgressEvent = {
 };
 
 export const TRAIN_PROGRESS_EVENT = 'train:progress';
+
+// Prediction events
+export type PredictionCreatedEvent = {
+  id: string;
+  agentId: string;
+  strategyId: string;
+  symbol: string;
+  timeframe: string;
+  timestamp: string;
+  action: string;
+  confidence: number;
+  stopLoss?: number | null;
+  takeProfit?: number | null;
+  meta?: any;
+};
+
+export const PREDICTION_CREATED_EVENT = 'prediction:created';
+
+export type PredictionUpdatedEvent = PredictionCreatedEvent & {
+  meta?: any;
+};
+export const PREDICTION_UPDATED_EVENT = 'prediction:updated';
+
+export type TradeCreatedEvent = {
+  id: string;
+  agentId: string;
+  strategyId: string;
+  symbol: string;
+  timeframe: string;
+  entryTime: string;
+  entryPrice: number;
+  stopLoss: number;
+  takeProfit: number;
+  action: 'buy' | 'sell';
+};
+export const TRADE_CREATED_EVENT = 'trade:created';

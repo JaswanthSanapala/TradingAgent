@@ -1,5 +1,6 @@
 import { prisma } from '@/lib/db';
 import { predictAction } from '@/lib/supervised-trainer';
+import { socketBus, PREDICTION_CREATED_EVENT } from '@/lib/socket-bus';
 
 function buildFeatures(row: any) {
   const { open, high, low, close, volume } = row;
@@ -52,7 +53,8 @@ export async function predictForAgent(params: {
   const rr = sParams.risk?.riskReward ?? 1.5;
 
   const last = rows[rows.length - 1];
-  const atr = (rows[rows.length - 1] as any).indicators?.[0]?.atr ?? 0;
+  const ind = (rows[rows.length - 1] as any).indicators?.[0] || {};
+  const atr = ind?.atr ?? 0;
   let stopLoss: number | undefined;
   let takeProfit: number | undefined;
   if (action === 'buy') {
@@ -62,6 +64,22 @@ export async function predictForAgent(params: {
     stopLoss = last.close + atrMult * atr;
     takeProfit = last.close - rr * ((stopLoss ?? last.close) - last.close);
   }
+
+  // Build a lightweight rationale string from indicators
+  const rsi = ind?.rsi as number | undefined;
+  const macd = ind?.macd as number | undefined;
+  const macdSignal = ind?.macdSignal as number | undefined;
+  const bbUpper = ind?.bbUpper as number | undefined;
+  const bbLower = ind?.bbLower as number | undefined;
+  const bbPos = bbUpper && bbLower ? (last.close - bbLower) / Math.max(1e-6, (bbUpper - bbLower)) : undefined;
+  const macdHist = macd !== undefined && macdSignal !== undefined ? macd - macdSignal : undefined;
+  const rationales: string[] = [];
+  if (rsi !== undefined) rationales.push(`RSI ${rsi.toFixed(1)}`);
+  if (macdHist !== undefined) rationales.push(`MACD hist ${macdHist >= 0 ? '+' : ''}${macdHist.toFixed(3)}`);
+  if (bbPos !== undefined) rationales.push(`BB pos ${(bbPos * 100).toFixed(0)}%`);
+  rationales.push(`ATR ${atr.toFixed(2)}`);
+  rationales.push(`Conf ${(confidence * 100).toFixed(0)}%`);
+  const rationale = `${action?.toUpperCase?.()}: ` + rationales.join(', ');
 
   const prediction = await prisma.tradePrediction.create({
     data: {
@@ -75,9 +93,26 @@ export async function predictForAgent(params: {
       confidence,
       stopLoss,
       takeProfit,
-      meta: { probs },
+      meta: { probs, indicators: ind, price: last.close, rationale, status: 'pending' },
     },
   });
+
+  // Emit socket event for live UI updates
+  try {
+    socketBus.emit(PREDICTION_CREATED_EVENT, {
+      id: prediction.id,
+      agentId: prediction.agentId,
+      strategyId: prediction.strategyId,
+      symbol: prediction.symbol,
+      timeframe: prediction.timeframe,
+      timestamp: prediction.timestamp.toISOString(),
+      action: prediction.action,
+      confidence: prediction.confidence,
+      stopLoss: prediction.stopLoss ?? null,
+      takeProfit: prediction.takeProfit ?? null,
+      meta: prediction.meta,
+    });
+  } catch {}
 
   return prediction;
 }

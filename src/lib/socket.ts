@@ -1,10 +1,21 @@
 import { Server } from 'socket.io';
-import { socketBus, TRAIN_PROGRESS_EVENT, type TrainProgressEvent } from '@/lib/socket-bus';
+import { socketBus, TRAIN_PROGRESS_EVENT, PREDICTION_CREATED_EVENT, PREDICTION_UPDATED_EVENT, TRADE_CREATED_EVENT } from '@/lib/socket-bus';
 
 export const setupSocket = (io: Server) => {
   // Relay training progress to all clients
   socketBus.on(TRAIN_PROGRESS_EVENT, (payload) => {
     io.emit('TRAIN_PROGRESS_EVENT', payload);
+  });
+
+  // Relay prediction and trade events to all clients
+  socketBus.on(PREDICTION_CREATED_EVENT, (payload) => {
+    io.emit('PREDICTION_CREATED_EVENT', payload);
+  });
+  socketBus.on(PREDICTION_UPDATED_EVENT, (payload) => {
+    io.emit('PREDICTION_UPDATED_EVENT', payload);
+  });
+  socketBus.on(TRADE_CREATED_EVENT, (payload) => {
+    io.emit('TRADE_CREATED_EVENT', payload);
   });
 
   io.on('connection', (socket) => {
@@ -33,9 +44,6 @@ export const setupSocket = (io: Server) => {
   });
 
   io.engine.on('connection_close', () => {
-    // Clean up listeners if server restarts
-    socketBus.off(TRAIN_PROGRESS_EVENT, (payload) => {
-      io.emit('TRAIN_PROGRESS_EVENT', payload);
-    });
+    // No-op; relying on process restart to reset listeners
   });
 };
