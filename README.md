@@ -1,151 +1,187 @@
-# 🚀 Welcome to Z.ai Code Scaffold
+# Welcome to AI Trading Platform
 
-A modern, production-ready web application scaffold powered by cutting-edge technologies, designed to accelerate your development with [Z.ai](https://chat.z.ai)'s AI-powered coding assistance.
+A modern, production-ready web application codebase powered by cutting-edge technologies, designed to accelerate your trading with AI-powered analysis assistance.
 
-## ✨ Technology Stack
+## Overview
 
-This scaffold provides a robust foundation built with:
+This TypeScript-first trading research platform combines a modern Next.js UI with a strong backend: a custom Socket.IO server, Prisma/SQLite database, and a modular core for strategies, indicators, and backtests.
 
-### 🎯 Core Framework
-- **⚡ Next.js 15** - The React framework for production with App Router
-- **📘 TypeScript 5** - Type-safe JavaScript for better developer experience
-- **🎨 Tailwind CSS 4** - Utility-first CSS framework for rapid UI development
+Key capabilities:
 
-### 🧩 UI Components & Styling
-- **🧩 shadcn/ui** - High-quality, accessible components built on Radix UI
-- **🎯 Lucide React** - Beautiful & consistent icon library
-- **🌈 Framer Motion** - Production-ready motion library for React
-- **🎨 Next Themes** - Perfect dark mode in 2 lines of code
+- Backtesting with detailed metrics (PnL, win-rate, drawdown, Sharpe, profit factor)
+- Technical indicators and patterns (RSI, MACD, Bollinger Bands, ATR, CCI, SMA, candlestick patterns)
+- Data pipeline with pluggable sources (ships with mock data; add real providers easily)
+- Real-time app updates via Socket.IO
+- Comprehensive Prisma schema for agents, strategies, trades, backtests, and more
 
-### 📋 Forms & Validation
-- **🎣 React Hook Form** - Performant forms with easy validation
-- **✅ Zod** - TypeScript-first schema validation
-
-### 🔄 State Management & Data Fetching
-- **🐻 Zustand** - Simple, scalable state management
-- **🔄 TanStack Query** - Powerful data synchronization for React
-- **🌐 Axios** - Promise-based HTTP client
-
-### 🗄️ Database & Backend
-- **🗄️ Prisma** - Next-generation Node.js and TypeScript ORM
-- **🔐 NextAuth.js** - Complete open-source authentication solution
-
-### 🎨 Advanced UI Features
-- **📊 TanStack Table** - Headless UI for building tables and datagrids
-- **🖱️ DND Kit** - Modern drag and drop toolkit for React
-- **📊 Recharts** - Redefined chart library built with React and D3
-- **🖼️ Sharp** - High performance image processing
-
-### 🌍 Internationalization & Utilities
-- **🌍 Next Intl** - Internationalization library for Next.js
-- **📅 Date-fns** - Modern JavaScript date utility library
-- **🪝 ReactUse** - Collection of essential React hooks for modern development
-
-## 🎯 Why This Scaffold?
-
-- **🏎️ Fast Development** - Pre-configured tooling and best practices
-- **🎨 Beautiful UI** - Complete shadcn/ui component library with advanced interactions
-- **🔒 Type Safety** - Full TypeScript configuration with Zod validation
-- **📱 Responsive** - Mobile-first design principles with smooth animations
-- **🗄️ Database Ready** - Prisma ORM configured for rapid backend development
-- **🔐 Auth Included** - NextAuth.js for secure authentication flows
-- **📊 Data Visualization** - Charts, tables, and drag-and-drop functionality
-- **🌍 i18n Ready** - Multi-language support with Next Intl
-- **🚀 Production Ready** - Optimized build and deployment settings
-- **🤖 AI-Friendly** - Structured codebase perfect for AI assistance
-
-## 🚀 Quick Start
-
-```bash
-# Install dependencies
-npm install
-
-# Start development server
-npm run dev
-
-# Build for production
-npm run build
-
-# Start production server
-npm start
-```
-
-Open [http://localhost:3000](http://localhost:3000) to see your application running.
-
-## 🔐 Environment Setup
-
-Sensitive links and credentials are loaded from environment variables.
-
-1) Copy `docs/ENV.example.md` values into a local `.env` file at the project root.
-2) Adjust values for your environment (e.g., `NEWS_FEEDS`, `EXCHANGE_*`, `NEXT_PUBLIC_*`).
-3) Restart the dev server after changes.
-
-Note: `.env*` is gitignored by default. Do not commit secrets.
-
-## 🤖 Powered by Z.ai
-
-This scaffold is optimized for use with [Z.ai](https://chat.z.ai) - your AI assistant for:
-
-- **💻 Code Generation** - Generate components, pages, and features instantly
-- **🎨 UI Development** - Create beautiful interfaces with AI assistance  
-- **🔧 Bug Fixing** - Identify and resolve issues with intelligent suggestions
-- **📝 Documentation** - Auto-generate comprehensive documentation
-- **🚀 Optimization** - Performance improvements and best practices
-
-Ready to build something amazing? Start chatting with Z.ai at [chat.z.ai](https://chat.z.ai) and experience the future of AI-powered development!
-
-## 📁 Project Structure
-
-```
-src/
-├── app/                 # Next.js App Router pages
-├── components/          # Reusable React components
-│   └── ui/             # shadcn/ui components
-├── hooks/              # Custom React hooks
-└── lib/                # Utility functions and configurations
-```
-
-## 🎨 Available Features & Components
-
-This scaffold includes a comprehensive set of modern web development tools:
-
-### 🧩 UI Components (shadcn/ui)
-- **Layout**: Card, Separator, Aspect Ratio, Resizable Panels
-- **Forms**: Input, Textarea, Select, Checkbox, Radio Group, Switch
-- **Feedback**: Alert, Toast (Sonner), Progress, Skeleton
-- **Navigation**: Breadcrumb, Menubar, Navigation Menu, Pagination
-- **Overlay**: Dialog, Sheet, Popover, Tooltip, Hover Card
-- **Data Display**: Badge, Avatar, Calendar
-
-### 📊 Advanced Data Features
-- **Tables**: Powerful data tables with sorting, filtering, pagination (TanStack Table)
-- **Charts**: Beautiful visualizations with Recharts
-- **Forms**: Type-safe forms with React Hook Form + Zod validation
-
-### 🎨 Interactive Features
-- **Animations**: Smooth micro-interactions with Framer Motion
-- **Drag & Drop**: Modern drag-and-drop functionality with DND Kit
-- **Theme Switching**: Built-in dark/light mode support
-
-### 🔐 Backend Integration
-- **Authentication**: Ready-to-use auth flows with NextAuth.js
-- **Database**: Type-safe database operations with Prisma
-- **API Client**: HTTP requests with Axios + TanStack Query
-- **State Management**: Simple and scalable with Zustand
-
-### 🌍 Production Features
-- **Internationalization**: Multi-language support with Next Intl
-- **Image Optimization**: Automatic image processing with Sharp
-- **Type Safety**: End-to-end TypeScript with Zod validation
-- **Essential Hooks**: 100+ useful React hooks with ReactUse for common patterns
-
-## 🤝 Get Started with Z.ai
-
-1. **Clone this scaffold** to jumpstart your project
-2. **Visit [chat.z.ai](https://chat.z.ai)** to access your AI coding assistant
-3. **Start building** with intelligent code generation and assistance
-4. **Deploy with confidence** using the production-ready setup
+Note: Live trading, real broker connections, and production-grade ML are not enabled by default. The codebase includes stubs and structure to integrate them.
 
 ---
 
-Built with ❤️ for the developer community. Supercharged by [Z.ai](https://chat.z.ai) 🚀
+## Tech Stack
+
+- Next.js 15 (App Router), React 19, TypeScript 5
+- Tailwind CSS 4, shadcn/ui, Lucide icons
+- Prisma ORM (SQLite)
+- Socket.IO (server + client)
+- Nodemon + tsx custom server
+- TanStack Query, Zustand, React Hook Form, Zod
+
+---
+
+## Folder Structure
+
+```
+.
+├─ prisma/
+│  └─ schema.prisma            # Database schema (SQLite)
+├─ db/
+│  └─ custom.db                # SQLite DB file (created after push/migrate)
+├─ public/                     # Static assets
+├─ src/
+│  ├─ app/                     # Next.js App Router
+│  ├─ components/              # UI components (incl. shadcn/ui wrappers)
+│  ├─ hooks/                   # Custom hooks
+│  └─ lib/                     # Core domain logic
+├─ uploads/                    # User-uploaded strategy artifacts
+├─ server.ts                   # Custom Next.js + Socket.IO server
+├─ next.config.ts              # Next.js configuration
+├─ package.json                # Scripts and dependencies
+├─ tsconfig.json               # TypeScript configuration
+├─ tailwind.config.ts          # Tailwind configuration
+└─ .gitignore                  # Excludes node_modules, .env*, .next, etc.
+```
+
+---
+
+## Environment Variables
+
+Create a `.env` file in the project root. Required by `src/lib/config.ts`:
+
+- SYMBOLS: comma-separated trading symbols (e.g., `BTC/USDT,ETH/USDT`)
+- TIMEFRAMES: comma-separated timeframes (e.g., `1h,4h,1d`)
+
+Optional:
+
+- DATABASE_URL (SQLite). Example: `file:./db/custom.db`
+- HOSTNAME (default: `0.0.0.0`)
+- PORT (default: `3000`)
+- SCHEDULER_ENABLED (default: `true`)
+- SCHEDULER_TICK_MS (default: `15000`)
+- NEXT_PUBLIC_SITE_URL
+- NEXT_PUBLIC_SOCKET_PATH (default: `/api/socketio`)
+- NEWS_FEEDS
+- EXCHANGE_ID, EXCHANGE_API_KEY, EXCHANGE_SECRET, EXCHANGE_SANDBOX
+
+Example `.env`:
+
+```env
+DATABASE_URL="file:./db/custom.db"
+SYMBOLS="BTC/USDT,ETH/USDT"
+TIMEFRAMES="1h,4h,1d"
+HOSTNAME="0.0.0.0"
+PORT="3000"
+SCHEDULER_ENABLED="true"
+NEXT_PUBLIC_SOCKET_PATH="/api/socketio"
+```
+
+---
+
+## Setup & Installation
+
+```bash
+# 1) Install dependencies
+npm install
+
+# 2) Generate Prisma client and create the SQLite schema
+npm run db:generate
+npm run db:push
+```
+
+This creates `db/custom.db` and generates the Prisma client.
+
+---
+
+## Development
+
+Runs a custom Next.js server with Socket.IO via `server.ts`.
+
+```bash
+npm run dev
+```
+
+Open http://localhost:3000
+
+---
+
+## Production
+
+Build Next.js, then start the custom server.
+
+```bash
+# Build Next.js
+npm run build
+
+# Start (POSIX shells)
+npm start
+```
+
+Windows PowerShell:
+
+```powershell
+$env:NODE_ENV = 'production'; npx tsx server.ts
+# or
+$env:NODE_ENV = 'production'; node --loader tsx server.ts
+```
+
+---
+
+## Useful Scripts
+
+```bash
+# Prisma
+npm run db:generate
+npm run db:push
+npm run db:migrate
+npm run db:reset
+
+# Lint
+npm run lint
+```
+
+---
+
+## Features Summary
+
+- Strategy-driven AI agents (pluggable training/inference)
+- Backtesting with rich metrics
+- Risk & money management in simulations
+- Indicators & candlestick patterns built-in
+- Data pipeline with indicator calculation
+- Real-time updates via Socket.IO
+- API-first architecture with Next.js routes
+- Modern UI/UX with shadcn/ui + Tailwind
+
+---
+
+## Roadmap (Not Included by Default)
+
+- Live trading execution and broker integrations
+- Persistent ML training/inference
+- Live market data streaming providers
+- Full authentication flows wired to UI
+
+---
+
+## Troubleshooting
+
+- If `SYMBOLS` or `TIMEFRAMES` are missing, the server will throw on startup. Define them in `.env`.
+- On Windows production start, prefer the PowerShell command over `npm start`.
+- Ensure you ran `npm run build` before production start.
+- `.gitignore` excludes `.env*`, `.next/`, `node_modules/`, `/data`, logs, etc. After cloning, follow Setup to recreate what's needed.
+
+---
+
+## License
+
+MIT (or your preferred license).
