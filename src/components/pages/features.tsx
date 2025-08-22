@@ -1,30 +1,66 @@
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Brain, BarChart3, Zap, Shield } from "lucide-react";
+import { Brain, Activity, FunctionSquare, Database, Radio, Shield, Server, Settings, Palette, Layers } from "lucide-react";
 
 const features = [
   {
-    title: "AI-Powered Trading Agents",
-    description: "Create and train intelligent trading agents based on your strategies",
+    title: "Strategy-Driven AI Agents",
+    description: "Design agent logic around your rules. Training stubs provided and ready to plug real ML models.",
     icon: Brain,
     color: "text-blue-600"
   },
   {
-    title: "Real-time Market Analysis",
-    description: "Live charts with pattern recognition and technical indicators",
-    icon: BarChart3,
+    title: "Backtest Engine",
+    description: "Robust simulation with PnL, drawdown, win-rate, and risk metrics to validate strategies.",
+    icon: Activity,
+    color: "text-emerald-600"
+  },
+  {
+    title: "Technical Indicators & Patterns",
+    description: "RSI, MACD, Bollinger Bands, ATR, CCI and common candlestick patterns built-in.",
+    icon: FunctionSquare,
+    color: "text-indigo-600"
+  },
+  {
+    title: "Data Pipeline",
+    description: "Pluggable market data pipeline with indicator calculation (ships with mock data by default).",
+    icon: Database,
+    color: "text-orange-600"
+  },
+  {
+    title: "Real-time Updates",
+    description: "Socket.IO powered event channel for streaming status and results across the app.",
+    icon: Radio,
     color: "text-green-600"
   },
   {
-    title: "Automated Trading",
-    description: "Execute trades automatically with integrated broker connections",
-    icon: Zap,
+    title: "Risk & Money Management",
+    description: "Position sizing, stop-loss/TP logic, and capital rules integrated into simulations.",
+    icon: Shield,
+    color: "text-red-600"
+  },
+  {
+    title: "API-First Architecture",
+    description: "Comprehensive Next.js API routes to orchestrate agents, backtests, data, and results.",
+    icon: Server,
     color: "text-purple-600"
   },
   {
-    title: "Risk Management",
-    description: "Advanced risk and money management as per your strategy",
-    icon: Shield,
-    color: "text-red-600"
+    title: "Admin & Project Management",
+    description: "Admin tools and organized uploads to manage strategies, runs, and artifacts.",
+    icon: Settings,
+    color: "text-slate-600"
+  },
+  {
+    title: "Modern UI/UX",
+    description: "Responsive interface with shadcn/ui, Tailwind CSS, and dark mode-ready components.",
+    icon: Palette,
+    color: "text-pink-600"
+  },
+  {
+    title: "Modular TypeScript Stack",
+    description: "Next.js 15, Prisma ORM, and a layered codebase for easy extension and maintenance.",
+    icon: Layers,
+    color: "text-cyan-600"
   }
 ];
 
