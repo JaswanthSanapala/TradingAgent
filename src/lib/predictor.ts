@@ -1,27 +1,8 @@
 import { prisma } from '@/lib/db';
-import { predictAction } from '@/lib/supervised-trainer';
+import { predictAction, buildFeatures } from '@/lib/ml-utils';
 import { socketBus, PREDICTION_CREATED_EVENT } from '@/lib/socket-bus';
 
-function buildFeatures(row: any) {
-  const { open, high, low, close, volume } = row;
-  const rsi = row.rsi ?? 50;
-  const macd = row.macd ?? 0;
-  const macdSignal = row.macdSignal ?? 0;
-  const bbUpper = row.bbUpper ?? close;
-  const bbLower = row.bbLower ?? close;
-  const atr = row.atr ?? 0;
-  const spreadBB = bbUpper - bbLower || 1e-6;
-  return [
-    close,
-    volume,
-    rsi,
-    macd,
-    macdSignal,
-    (close - bbLower) / spreadBB,
-    atr,
-    (high - low) / (close || 1e-6),
-  ];
-}
+// buildFeatures imported from '@/lib/ml-utils'
 
 export async function predictForAgent(params: {
   agentId: string;

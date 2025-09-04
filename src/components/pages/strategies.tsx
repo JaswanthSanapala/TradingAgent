@@ -151,9 +151,9 @@ export default function StrategiesPage() {
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
-      const allowedTypes = ['.md', '.txt', '.js', '.ts', '.py'];
+      const allowedTypes = ['.js'];
       const fileExtension = '.' + file.name.split('.').pop()?.toLowerCase();
-      
+
       if (allowedTypes.includes(fileExtension)) {
         setFormData(prev => ({ ...prev, file }));
         setFileName(file.name);
@@ -164,7 +164,7 @@ export default function StrategiesPage() {
         };
         reader.readAsText(file);
       } else {
-        toast.error('Please upload only .md, .txt, .js, .ts, or .py files');
+        toast.error('Please upload a .js strategy file');
         e.target.value = '';
       }
     }
@@ -252,7 +252,7 @@ export default function StrategiesPage() {
                       <Input
                         id="file"
                         type="file"
-                        accept=".md,.txt,.js,.ts,.py"
+                        accept=".js"
                         onChange={handleFileChange}
                         className="cursor-pointer hidden"
                         ref={fileInputRef}
@@ -269,7 +269,7 @@ export default function StrategiesPage() {
                         </>
                       )}
                       <p className="text-xs text-muted-foreground basis-full">
-                        Upload .md, .txt, .js, .ts or .py files only
+                        Upload .js strategy files only (module must export computeActions(ctx))
                       </p>
                     </div>
                   </div>

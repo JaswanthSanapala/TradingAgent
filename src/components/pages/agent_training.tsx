@@ -59,7 +59,7 @@ type TrainingResult = {
 
 export default function AgentTrainingPage() {
   const [agents, setAgents] = useState<Agent[]>([]);
-  const [untrained, setUntrained] = useState<Strategy[]>([]);
+  const [strategyOptions, setStrategyOptions] = useState<Strategy[]>([]);
   const [loading, setLoading] = useState(true);
   const [creating, setCreating] = useState(false);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
@@ -87,7 +87,14 @@ export default function AgentTrainingPage() {
       const data = await res.json();
       if (data.success) {
         setAgents(data.agents || []);
-        setUntrained(data.untrainedStrategies || []);
+        // Build strategy options from the agents list (agent is auto-created per strategy)
+        const uniq: Record<string, Strategy> = {};
+        (data.agents || []).forEach((a: any) => {
+          if (!uniq[a.strategyId]) {
+            uniq[a.strategyId] = { id: a.strategyId, name: a.strategy?.name || a.strategyId };
+          }
+        });
+        setStrategyOptions(Object.values(uniq));
       } else {
         toast.error(data.error || "Failed to fetch agents");
       }
@@ -100,7 +107,7 @@ export default function AgentTrainingPage() {
   const loadDatasets = async () => {
     try {
       setDsLoading(true);
-      const res = await fetch('/api/coverage/manifests');
+      const res = await fetch('/api/datasets');
       const json = await res.json();
       setDatasets(json.items || []);
     } catch (e) {
@@ -115,7 +122,7 @@ export default function AgentTrainingPage() {
     if (!raw) return null;
     try {
       setDsResolving(true);
-      const url = `/api/markets/resolve?symbol=${encodeURIComponent(raw)}&exchangeId=${encodeURIComponent(ex || 'binance')}`;
+      const url = `/api/symbols/resolve?symbol=${encodeURIComponent(raw)}&exchangeId=${encodeURIComponent(ex || 'binance')}`;
       const res = await fetch(url);
       const json = await res.json();
       if (json.ok && json.matched && json.storageSymbol) {
@@ -188,39 +195,28 @@ export default function AgentTrainingPage() {
     }
     setCreating(true);
     try {
-      const res = await fetch("/api/agents", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ strategyId: selectedStrategyId }),
-      });
-      const data = await res.json();
-      if (data.success) {
-        const createdAgentId: string | undefined = data.agent?.id || data.agentId;
-        let agentId = createdAgentId;
-        if (!agentId) {
-          await fetchData();
-          const newly = agents.find(a => a.strategyId === selectedStrategyId);
-          agentId = newly?.id;
-        }
-        if (!agentId) {
-          toast.warning('Agent created but not found for training');
-        } else {
-          for (const dsId of selectedDatasetIds) {
-            fetch(`/api/agents/${agentId}/rl/train`, {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ datasetId: dsId }),
-            }).catch(() => {});
-          }
-        }
-        toast.success("Agent created. Training started for selected dataset(s)");
-        setIsDialogOpen(false);
-        setSelectedStrategyId("");
-        setSelectedDatasetIds([]);
-        await fetchData();
-      } else {
-        toast.error(data.error || "Failed to start training");
+      // Fetch the freshest agents list to avoid stale state
+      const res = await fetch('/api/agents');
+      const json = await res.json();
+      const currentAgents: Agent[] = (json?.agents || []) as Agent[];
+      const agentMatch = currentAgents.find(a => a.strategyId === selectedStrategyId);
+      if (!agentMatch) {
+        toast.error('No agent found for the selected strategy');
+        return;
       }
+      const agentId = agentMatch.id;
+      for (const dsId of selectedDatasetIds) {
+        fetch(`/api/agents/${agentId}/rl/train`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ datasetId: dsId }),
+        }).catch(() => {});
+      }
+      toast.success('Training started for selected dataset(s)');
+      setIsDialogOpen(false);
+      setSelectedStrategyId("");
+      setSelectedDatasetIds([]);
+      await fetchData();
     } catch (e) {
       console.error(e);
       toast.error("Failed to start training");
@@ -300,10 +296,10 @@ export default function AgentTrainingPage() {
                   <Label>Strategy</Label>
                   <Select value={selectedStrategyId} onValueChange={setSelectedStrategyId}>
                     <SelectTrigger>
-                      <SelectValue placeholder={untrained.length ? "Select a strategy" : "No untrained strategies"} />
+                      <SelectValue placeholder={strategyOptions.length ? "Select a strategy" : "No strategies available"} />
                     </SelectTrigger>
                     <SelectContent>
-                      {untrained.map(s => (
+                      {strategyOptions.map(s => (
                         <SelectItem key={s.id} value={s.id}>{s.name}</SelectItem>
                       ))}
                     </SelectContent>
@@ -416,7 +412,7 @@ export default function AgentTrainingPage() {
                         const corrected = await resolveSymbol(dsForm.symbol, dsForm.exchangeId);
                         const payload = { ...dsForm, symbol: corrected || dsForm.symbol };
                         try {
-                          const res = await fetch('/api/coverage/manifests', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
+                          const res = await fetch('/api/datasets', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
                           if (!res.ok) throw new Error('Create failed');
                           toast.success('Dataset created');
                           await loadDatasets();
@@ -448,7 +444,7 @@ export default function AgentTrainingPage() {
                                   const ok = window.confirm(`Delete dataset ${d.symbol} ${d.timeframe}? This cannot be undone.`);
                                   if (!ok) return;
                                   try {
-                                    const res = await fetch(`/api/coverage/manifests?id=${encodeURIComponent(d.id)}`, { method: 'DELETE' });
+                                    const res = await fetch(`/api/datasets?id=${encodeURIComponent(d.id)}`, { method: 'DELETE' });
                                     if (!res.ok) throw new Error('Delete failed');
                                     toast.success('Dataset deleted');
                                     await loadDatasets();

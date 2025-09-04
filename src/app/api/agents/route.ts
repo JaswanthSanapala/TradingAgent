@@ -1,9 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/db';
 import { compileStrategy } from '@/lib/strategy-compiler';
+import { queues, defaultJobOpts, SupervisedJobData } from '@/lib/queue';
 
-// Simple in-memory training job tracker (since we run a custom Node server)
-const trainingJobs = new Map<string, NodeJS.Timeout>();
+// Durable job queue is used now; remove in-memory tracker
 
 export const dynamic = 'force-dynamic';
 
@@ -87,61 +87,44 @@ export async function POST(request: NextRequest) {
           strategyIR: compiled,
           strategyOrigin: compiled?.origin,
         },
-        performance: { progress: 0, status: 'training' },
+        performance: { progress: 0, status: 'queued' },
         strategyId: strategy.id,
         userId: user.id,
       },
     });
 
-    // Start a simple training simulation that updates progress to 100%
-    if (trainingJobs.has(agent.id)) {
-      clearInterval(trainingJobs.get(agent.id)!);
-      trainingJobs.delete(agent.id);
-    }
+    // Create a TrainingRun placeholder with status 'running' once job starts
+    const trainingRun = await prisma.trainingRun.create({
+      data: {
+        agentId: agent.id,
+        runType: 'supervised',
+        params: { createdFrom: 'api/agents', defaulted: true },
+        status: 'running',
+      },
+    });
 
-    let progress = 0;
-    const interval = setInterval(async () => {
-      try {
-        progress = Math.min(100, progress + Math.floor(Math.random() * 15) + 5);
-        const status = progress < 100 ? 'training' : 'completed';
+    // Enqueue supervised training job with sensible defaults for now
+    const jobData: SupervisedJobData = {
+      runId: trainingRun.id,
+      agentId: agent.id,
+      strategyId: strategy.id,
+      symbol: 'BTC/USDT',
+      timeframe: '1h',
+      lookback: 64,
+      lookahead: 1,
+      limit: 5000,
+      epochs: 8,
+      batchSize: 64,
+      labelingMode: 'future_return',
+      ratios: { train: 0.8, val: 0.1, test: 0.1 },
+      walkForward: null,
+    };
 
-        await prisma.agent.update({
-          where: { id: agent.id },
-          data: { performance: { progress, status } },
-        });
+    const job = await queues.train_supervised.add('supervised_train', jobData, defaultJobOpts);
 
-        if (progress >= 100) {
-          clearInterval(interval);
-          trainingJobs.delete(agent.id);
-          // Write a basic TrainingResult
-          await prisma.trainingResult.create({
-            data: {
-              agentId: agent.id,
-              episode: 100,
-              totalReward: Math.random() * 1000,
-              steps: 10000,
-              winRate: 0.4 + Math.random() * 0.4,
-              sharpeRatio: 0.5 + Math.random() * 1.0,
-              maxDrawdown: 0.1 + Math.random() * 0.2,
-              parameters: { lr: 3e-4 },
-              metrics: { accuracy: 0.5 + Math.random() * 0.4 },
-            },
-          });
-        }
-      } catch (e) {
-        console.error('Training progress update failed:', e);
-        clearInterval(interval);
-        trainingJobs.delete(agent.id);
-        await prisma.agent.update({
-          where: { id: agent.id },
-          data: { performance: { progress, status: 'failed' } },
-        });
-      }
-    }, 1500);
+    await prisma.agent.update({ where: { id: agent.id }, data: { performance: { progress: 0, status: 'training', jobId: job.id } } });
 
-    trainingJobs.set(agent.id, interval);
-
-    return NextResponse.json({ success: true, agent });
+    return NextResponse.json({ success: true, agent, runId: trainingRun.id, jobId: job.id });
   } catch (error) {
     console.error('Error creating agent:', error);
     return NextResponse.json({ success: false, error: 'Failed to create agent' }, { status: 500 });
@@ -157,38 +140,15 @@ export async function PATCH(request: NextRequest) {
     const agent = await prisma.agent.findUnique({ where: { id: agentId } });
     if (!agent) return NextResponse.json({ success: false, error: 'Agent not found' }, { status: 404 });
 
-    if (action === 'pause' && trainingJobs.has(agentId)) {
-      clearInterval(trainingJobs.get(agentId)!);
-      trainingJobs.delete(agentId);
+    // Queue-backed controls could be implemented here (pause/resume/stop), but for now just update status
+    if (action === 'pause') {
       await prisma.agent.update({ where: { id: agentId }, data: { performance: { ...(agent.performance as any), status: 'paused' } } });
     } else if (action === 'resume') {
-      // Simple resume: start another interval
-      let progress = (agent.performance as any)?.progress ?? 0;
-      const interval = setInterval(async () => {
-        try {
-          progress = Math.min(100, progress + Math.floor(Math.random() * 15) + 5);
-          const status = progress < 100 ? 'training' : 'completed';
-          await prisma.agent.update({ where: { id: agentId }, data: { performance: { progress, status } } });
-          if (progress >= 100) { clearInterval(interval); trainingJobs.delete(agentId); }
-        } catch (e) { clearInterval(interval); trainingJobs.delete(agentId); }
-      }, 1500);
-      trainingJobs.set(agentId, interval);
+      await prisma.agent.update({ where: { id: agentId }, data: { performance: { ...(agent.performance as any), status: 'training' } } });
     } else if (action === 'stop') {
-      if (trainingJobs.has(agentId)) { clearInterval(trainingJobs.get(agentId)!); trainingJobs.delete(agentId); }
       await prisma.agent.update({ where: { id: agentId }, data: { performance: { ...(agent.performance as any), status: 'stopped' } } });
     } else if (action === 'retry') {
-      // Reset and resume similar to POST
-      await prisma.agent.update({ where: { id: agentId }, data: { performance: { progress: 0, status: 'training' } } });
-      let progress = 0;
-      const interval = setInterval(async () => {
-        try {
-          progress = Math.min(100, progress + Math.floor(Math.random() * 15) + 5);
-          const status = progress < 100 ? 'training' : 'completed';
-          await prisma.agent.update({ where: { id: agentId }, data: { performance: { progress, status } } });
-          if (progress >= 100) { clearInterval(interval); trainingJobs.delete(agentId); }
-        } catch (e) { clearInterval(interval); trainingJobs.delete(agentId); }
-      }, 1500);
-      trainingJobs.set(agentId, interval);
+      await prisma.agent.update({ where: { id: agentId }, data: { performance: { progress: 0, status: 'queued' } } });
     }
 
     return NextResponse.json({ success: true });
@@ -203,12 +163,6 @@ export async function DELETE(request: NextRequest) {
     const body = await request.json().catch(() => ({}));
     const { agentId } = body as { agentId?: string };
     if (!agentId) return NextResponse.json({ success: false, error: 'agentId is required' }, { status: 400 });
-
-    // Stop any running simulated job
-    if (trainingJobs.has(agentId)) {
-      clearInterval(trainingJobs.get(agentId)!);
-      trainingJobs.delete(agentId);
-    }
 
     // Delete related results first, then the agent
     await prisma.trainingResult.deleteMany({ where: { agentId } });

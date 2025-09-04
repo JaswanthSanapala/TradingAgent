@@ -6,6 +6,11 @@ import { createServer } from 'http';
 import { Server } from 'socket.io';
 import next from 'next';
 import { startScheduler } from '@/lib/scheduler';
+import { startSupervisedWorker } from '@/workers/supervised-worker';
+import { startDataBackfillWorker } from '@/workers/data-backfill-worker';
+import { startDataExportWorker } from '@/workers/data-export-worker';
+import { startDataWindowsWorker } from '@/workers/data-windows-worker';
+import { startCoverageWorker, scheduleCoverageTick } from '@/workers/coverage-worker';
 
 const dev = process.env.NODE_ENV !== 'production';
 const currentPort = CONFIG.PORT;
@@ -57,6 +62,18 @@ async function createCustomServer() {
       } else {
         console.log('> Coverage scheduler: DISABLED via SCHEDULER_ENABLED=false');
       }
+      // Start BullMQ supervised training worker
+      startSupervisedWorker();
+      console.log('> Workers: supervised training worker started');
+      // Start data workers
+      startDataBackfillWorker();
+      startDataExportWorker();
+      startDataWindowsWorker();
+      console.log('> Workers: data workers started (backfill/export/windows)');
+      // Start coverage worker and schedule repeatable tick
+      startCoverageWorker();
+      scheduleCoverageTick();
+      console.log('> Workers: coverage worker started with repeatable tick');
     });
 
   } catch (err) {

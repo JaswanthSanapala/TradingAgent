@@ -70,16 +70,17 @@ export default function BacktestPage() {
     setStatusMsg("Backfilling market data...");
     try {
       // Ensure data exists for chosen period/timeframe
-      const backfillRes = await fetch("/api/data/backfill", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          symbol,
-          timeframe,
-          start: new Date(startDate).toISOString(),
-          end: new Date(endDate).toISOString(),
-          exchangeId: "binance",
-        }),
+      const q = new URLSearchParams({ symbol: symbol.replace('/', '_'), timeframe, exchangeId: 'binance' }).toString();
+      const dsRes = await fetch(`/api/datasets?${q}`);
+      const dsJson = await dsRes.json();
+      const ds = Array.isArray(dsJson?.items) ? dsJson.items[0] : null;
+      if (!ds) {
+        throw new Error('Dataset not found. Please create it in Admin > Coverage or Agent Training first.');
+      }
+      const backfillRes = await fetch(`/api/datasets/${encodeURIComponent(ds.id)}/backfill`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ from: new Date(startDate).toISOString(), to: new Date(endDate).toISOString() }),
       });
       await backfillRes.json().catch(() => ({}));
 

@@ -51,6 +51,8 @@
     "@tensorflow/tfjs-node": "^4.22.0",
     "axios": "^1.10.0",
     "ccxt": "^4.4.0",
+    "bullmq": "^5.31.2",
+    "ioredis": "^5.4.1",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
     "cmdk": "^1.1.1",

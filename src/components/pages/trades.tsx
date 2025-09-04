@@ -44,9 +44,20 @@ function TradeChart({ symbol, timeframe, to, entry, sl, tp }: { symbol: string; 
     const load = async () => {
       setLoading(true);
       try {
-        const res = await fetch(`/api/markets/ohlcv?symbol=${encodeURIComponent(symbol)}&timeframe=${encodeURIComponent(timeframe)}&to=${encodeURIComponent(to)}&limit=150`);
-        const json = await res.json();
-        if (json?.success) setData(json.data || []);
+        // Resolve dataset by symbol/timeframe
+        const q = new URLSearchParams({ symbol, timeframe }).toString();
+        const dsRes = await fetch(`/api/datasets?${q}`);
+        const dsJson = await dsRes.json();
+        const ds = Array.isArray(dsJson?.items) ? dsJson.items[0] : null;
+        if (!ds) {
+          setData([]);
+        } else {
+          const ohlcvUrl = `/api/datasets/${encodeURIComponent(ds.id)}/ohlcv?to=${encodeURIComponent(to)}&limit=150`;
+          const res = await fetch(ohlcvUrl);
+          const json = await res.json();
+          if (json?.success) setData(json.data || []);
+          else setData([]);
+        }
       } catch {}
       setLoading(false);
     };

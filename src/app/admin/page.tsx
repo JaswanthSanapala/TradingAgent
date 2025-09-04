@@ -14,7 +14,6 @@ export default function AdminPage() {
         <SupervisedAgentsCard />
         <FeedbackSuggestionsCard />
         <CoverageCard />
-        <JobsCard />
       </div>
     </div>
   );
@@ -26,9 +25,19 @@ function BackfillCard() {
   const onSubmit = async () => {
     setLoading(true);
     try {
-      const res = await fetch('/api/data/backfill', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(form) });
-      const json = await res.json();
-      alert(JSON.stringify(json));
+      // resolve dataset id by symbol/timeframe (and optional exchangeId)
+      const q = new URLSearchParams({ symbol: form.symbol, timeframe: form.timeframe, exchangeId: form.exchangeId }).toString();
+      const dsRes = await fetch(`/api/datasets?${q}`);
+      const dsJson = await dsRes.json();
+      const ds = Array.isArray(dsJson?.items) ? dsJson.items[0] : null;
+      if (!ds) {
+        alert('Dataset not found. Create it first in Datasets.');
+      } else {
+        const body = { from: form.start, to: form.end };
+        const res = await fetch(`/api/datasets/${encodeURIComponent(ds.id)}/backfill`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+        const json = await res.json();
+        alert(JSON.stringify(json));
+      }
     } finally { setLoading(false); }
   };
   return (
@@ -44,9 +53,18 @@ function ExportCard() {
   const onSubmit = async () => {
     setLoading(true);
     try {
-      const res = await fetch('/api/data/export', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(form) });
-      const json = await res.json();
-      alert(JSON.stringify(json));
+      const q = new URLSearchParams({ symbol: form.symbol, timeframe: form.timeframe }).toString();
+      const dsRes = await fetch(`/api/datasets?${q}`);
+      const dsJson = await dsRes.json();
+      const ds = Array.isArray(dsJson?.items) ? dsJson.items[0] : null;
+      if (!ds) {
+        alert('Dataset not found. Create it first in Datasets.');
+      } else {
+        const body = { from: form.start, to: form.end };
+        const res = await fetch(`/api/datasets/${encodeURIComponent(ds.id)}/export`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+        const json = await res.json();
+        alert(JSON.stringify(json));
+      }
     } finally { setLoading(false); }
   };
   return (
@@ -62,9 +80,18 @@ function WindowsCard() {
   const onSubmit = async () => {
     setLoading(true);
     try {
-      const res = await fetch('/api/data/windows', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(form) });
-      const json = await res.json();
-      alert(JSON.stringify(json));
+      const q = new URLSearchParams({ symbol: form.symbol, timeframe: form.timeframe }).toString();
+      const dsRes = await fetch(`/api/datasets?${q}`);
+      const dsJson = await dsRes.json();
+      const ds = Array.isArray(dsJson?.items) ? dsJson.items[0] : null;
+      if (!ds) {
+        alert('Dataset not found. Create it first in Datasets.');
+      } else {
+        const body = { windowSize: form.windowSize, stride: form.stride, maskRatio: form.maskRatio };
+        const res = await fetch(`/api/datasets/${encodeURIComponent(ds.id)}/windows`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+        const json = await res.json();
+        alert(JSON.stringify(json));
+      }
     } finally { setLoading(false); }
   };
   return (
@@ -325,7 +352,7 @@ function CoverageCard() {
   const [creating, setCreating] = useState(false);
   const [form, setForm] = useState({ symbol: 'BTC_USDT', timeframe: '1h', exchangeId: 'binance', startDate: '2018-01-01T00:00:00Z', endDate: '2099-01-01T00:00:00Z' });
   const load = async () => {
-    const res = await fetch('/api/coverage/manifests');
+    const res = await fetch('/api/datasets');
     const json = await res.json();
     setItems(json.items || []);
   };
@@ -333,20 +360,15 @@ function CoverageCard() {
   const create = async () => {
     setCreating(true);
     try {
-      await fetch('/api/coverage/manifests', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(form) });
+      await fetch('/api/datasets', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(form) });
       await load();
     } finally { setCreating(false); }
-  };
-  const forceTick = async () => {
-    await fetch('/api/coverage/jobs', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'tick' }) });
-    await load();
   };
   return (
     <Card title="Coverage Manifests" onSubmit={create} loading={creating}>
       <FormGrid state={form} setState={setForm} fields={[ 'symbol','timeframe','exchangeId','startDate','endDate' ]} />
       <div className="mt-3 flex gap-2">
         <button className="px-3 py-1 bg-blue-600 text-white rounded" onClick={create} disabled={creating}>Create Manifest</button>
-        <button className="px-3 py-1 bg-indigo-600 text-white rounded" onClick={forceTick}>Force Tick</button>
       </div>
       <ul className="mt-4 space-y-2 max-h-64 overflow-auto">
         {items.map((m:any) => (
@@ -357,49 +379,6 @@ function CoverageCard() {
           </li>
         ))}
       </ul>
-    </Card>
-  );
-}
-
-function JobsCard() {
-  const [jobs, setJobs] = useState<any[]>([]);
-  const load = async () => {
-    const res = await fetch('/api/coverage/jobs');
-    const json = await res.json();
-    setJobs(json.items || []);
-  };
-  useEffect(() => { load(); }, []);
-  return (
-    <Card title="Ingest Jobs">
-      <div className="mb-2">
-        <button className="px-3 py-1 bg-blue-600 text-white rounded" onClick={load}>Refresh</button>
-      </div>
-      <div className="max-h-64 overflow-auto text-sm">
-        <table className="w-full border">
-          <thead>
-            <tr className="bg-gray-50">
-              <th className="p-1 text-left">Status</th>
-              <th className="p-1 text-left">Symbol</th>
-              <th className="p-1 text-left">TF</th>
-              <th className="p-1 text-left">Start</th>
-              <th className="p-1 text-left">End</th>
-              <th className="p-1 text-left">Inserted</th>
-            </tr>
-          </thead>
-          <tbody>
-            {jobs.map((j:any) => (
-              <tr key={j.id} className="border-t">
-                <td className="p-1">{j.status}</td>
-                <td className="p-1">{j.symbol}</td>
-                <td className="p-1">{j.timeframe}</td>
-                <td className="p-1">{new Date(j.rangeStart).toISOString()}</td>
-                <td className="p-1">{new Date(j.rangeEnd).toISOString()}</td>
-                <td className="p-1">{j.inserted}</td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
     </Card>
   );
 }

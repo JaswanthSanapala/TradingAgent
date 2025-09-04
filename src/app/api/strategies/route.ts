@@ -96,7 +96,27 @@ export async function POST(request: NextRequest) {
 
     const strategy = await prisma.strategy.create({ data });
 
-    return NextResponse.json({ success: true, strategy });
+    // Auto-create an Agent for this strategy that "understands" the compiled IR
+    // Use a sensible default algorithm and embed the compiled IR + origin reference
+    const agentName = `${name} Agent`;
+    const createdAgent = await prisma.agent.create({
+      data: {
+        name: agentName,
+        algorithm: 'ppo',
+        version: 1,
+        parameters: {
+          lr: 3e-4,
+          gamma: 0.99,
+          strategyIR: (data.parameters as any)?.compiled,
+          strategyOrigin: (data.parameters as any)?.compiled?.origin,
+        },
+        performance: { progress: 0, status: 'pending' },
+        strategyId: strategy.id,
+        userId: user.id,
+      },
+    });
+
+    return NextResponse.json({ success: true, strategy, agent: createdAgent });
   } catch (error) {
     console.error('Error creating strategy:', error);
     return NextResponse.json(

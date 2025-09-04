@@ -8,13 +8,15 @@ function envOrThrow(key: string): string {
 
 export const CONFIG = {
   // Server
-  HOSTNAME: process.env.HOSTNAME || "0.0.0.0",
-  PORT: Number(process.env.PORT || 3000),
+  HOSTNAME: process.env.HOSTNAME,
+  PORT: Number(process.env.PORT),
   SCHEDULER_ENABLED: (process.env.SCHEDULER_ENABLED ?? "true").toLowerCase() !== "false",
-  SCHEDULER_TICK_MS: Number(process.env.SCHEDULER_TICK_MS || 15000),
+  SCHEDULER_TICK_MS: Number(process.env.SCHEDULER_TICK_MS),
+  // Workers
+  SUPERVISED_WORKER_ENABLED: (process.env.SUPERVISED_WORKER_ENABLED ?? 'false').toLowerCase() === 'true',
 
   // Client/site
-  NEXT_PUBLIC_SITE_URL: process.env.NEXT_PUBLIC_SITE_URL,
+  NEXT_PUBLIC_SITE_URL: process.env.NEXT_PUBLIC_SITE_URL, 
   NEXT_PUBLIC_SOCKET_PATH: process.env.NEXT_PUBLIC_SOCKET_PATH,
 
   // News feeds: comma-separated URLs; optional names using Name|URL segments separated by commas

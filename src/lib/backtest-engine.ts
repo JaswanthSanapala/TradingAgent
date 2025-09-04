@@ -1,5 +1,8 @@
 import { prisma } from '@/lib/db';
 import { logger } from '@/lib/logger';
+import path from 'path';
+import fs from 'fs';
+import { predictAction, buildFeatures } from '@/lib/ml-utils';
 
 export interface BacktestConfig {
   startDate: Date;
@@ -123,9 +126,8 @@ export class BacktestEngine {
             lte: this.config.endDate,
           },
         },
-        orderBy: {
-          timestamp: 'asc',
-        },
+        orderBy: { timestamp: 'asc' },
+        include: { indicators: true },
       });
     } catch (error) {
       logger.error('Error retrieving market data:', error);
@@ -174,15 +176,18 @@ export class BacktestEngine {
 
   private async loadAgentModel(agent: any): Promise<any> {
     try {
-      // Load the agent's trained model
-      // This would typically involve loading a neural network model
-      // For now, we'll return the agent configuration
-      return {
-        id: agent.id,
-        modelPath: agent.modelPath,
-        parameters: agent.parameters,
-        strategy: agent.strategy,
-      };
+      // Load scaler to determine lookback/featDim
+      let lookback = 0;
+      let featDim = 0;
+      if (agent.modelPath) {
+        try {
+          const raw = fs.readFileSync(path.join(agent.modelPath, 'scaler.json'), 'utf8');
+          const parsed = JSON.parse(raw);
+          lookback = parsed.lookback || 0;
+          featDim = parsed.featDim || 0;
+        } catch {}
+      }
+      return { id: agent.id, modelPath: agent.modelPath, parameters: agent.parameters, strategy: agent.strategy, lookback, featDim };
     } catch (error) {
       logger.error('Error loading agent model:', error);
       return null;
@@ -191,33 +196,13 @@ export class BacktestEngine {
 
   private async getAgentDecision(agentModel: any, marketData: any[]): Promise<any> {
     try {
-      // This is where the agent makes trading decisions
-      // In a real implementation, this would use the loaded model
-      // to predict actions based on market data
-
-      // For demonstration, we'll use a simple logic
-      if (marketData.length < 20) return null;
-
-      const recentData = marketData.slice(-20);
-      const closes = recentData.map(d => d.close);
-      
-      // Simple moving average crossover strategy
-      const sma5 = closes.slice(-5).reduce((a, b) => a + b, 0) / 5;
-      const sma20 = closes.reduce((a, b) => a + b, 0) / 20;
-
-      if (sma5 > sma20) {
-        return {
-          action: 'buy',
-          confidence: 0.7,
-        };
-      } else if (sma5 < sma20) {
-        return {
-          action: 'sell',
-          confidence: 0.7,
-        };
-      }
-
-      return null;
+      if (!agentModel || !agentModel.modelPath || !agentModel.lookback) return null;
+      const lb = agentModel.lookback as number;
+      if (marketData.length < lb) return null;
+      const windowRows = marketData.slice(-lb);
+      const window = windowRows.map((r: any) => buildFeatures({ ...r, ...(r as any).indicators?.[0] }));
+      const { action, confidence } = await predictAction(agentModel.modelPath, window);
+      return { action, confidence };
     } catch (error) {
       logger.error('Error getting agent decision:', error);
       return null;
