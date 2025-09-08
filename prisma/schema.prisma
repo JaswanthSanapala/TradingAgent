@@ -186,6 +186,8 @@ model Trade {
   agentId      String
   strategyId   String
   backtestId   String?
+  symbol       String
+  exchangeOrderId String?
   entryTime    DateTime
   exitTime     DateTime?
   entryPrice   Float
@@ -322,6 +324,21 @@ model TrainingRun {
 
   // Relations
   agent Agent @relation(fields: [agentId], references: [id], onDelete: Cascade)
+}
+
+model PendingOrder {
+  id              String   @id @default(cuid())
+  agentId         String
+  strategyId      String
+  symbol          String
+  exchangeOrderId String   @unique
+  side            TradeAction
+  type            String // 'market' | 'limit'
+  amount          Float
+  price           Float?
+  status          String   @default("open") // open, closed, canceled
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
 }
 
 model TradePrediction {

@@ -28,6 +28,17 @@ export const CONFIG = {
   EXCHANGE_SECRET: process.env.EXCHANGE_SECRET,
   EXCHANGE_SANDBOX: (process.env.EXCHANGE_SANDBOX ?? 'false').toLowerCase() === 'true',
 
+  // Execution controls
+  EXECUTION_ENABLED: (process.env.EXECUTION_ENABLED ?? 'false').toLowerCase() === 'true',
+  RISK_PER_TRADE_PCT: Number(process.env.RISK_PER_TRADE_PCT ?? '1'), // percent of quote balance
+  QUOTE_CURRENCY: process.env.QUOTE_CURRENCY || 'USDT',
+  ORDER_POLL_MS: Number(process.env.ORDER_POLL_MS ?? '5000'),
+
+  // Prediction routing
+  PREDICTION_MIN_CONF: Number(process.env.PREDICTION_MIN_CONF ?? '0.5'),
+  PREDICTION_COOLDOWN_SEC: Number(process.env.PREDICTION_COOLDOWN_SEC ?? '60'),
+  DO_NOT_TRADE: (process.env.DO_NOT_TRADE || '').split(',').map(s => s.trim()).filter(Boolean),
+
   // Symbols and timeframes
   SYMBOLS: envOrThrow('SYMBOLS').split(',').map(s => s.trim()).filter(Boolean),
   TIMEFRAMES: envOrThrow('TIMEFRAMES').split(',')

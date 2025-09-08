@@ -28,6 +28,10 @@ export class PPOTrainer {
   private step = 0;
   private version = 1;
   private ckptDir: string;
+  private lastAvgReward: number = 0;
+  private lastPolicyLoss: number = 0;
+  private lastValueLoss: number = 0;
+  private lastEntropy: number = 0;
 
   constructor(opts: { agentId: string; envCfg: EnvConfig; hparams: PPOHyperParams }) {
     this.agentId = opts.agentId;
@@ -66,8 +70,10 @@ export class PPOTrainer {
     const window = (this.model.inputs[0].shape![1] as number);
 
     let sArr = this.env.reset();
-    while (this.state !== 'stopping') {
-      if (this.state === 'paused') { await new Promise(r => setTimeout(r, 100)); continue; }
+    while (true) {
+      const st = this.getState();
+      if (st === 'stopping') break;
+      if (st === 'paused') { await new Promise(r => setTimeout(r, 100)); continue; }
 
       // collect rollout
       obs.length = 0; actions.length = 0; logProbs.length = 0; rewards.length = 0; values.length = 0; dones.length = 0;
@@ -95,10 +101,18 @@ export class PPOTrainer {
       const adv = gaeAdvantages(rewards, values, dones, this.h.gamma, this.h.gaeLambda);
       const ret = values.map((v, i) => v + adv[i]);
 
-      // optimize policy with minibatches
-      await this.update(obs, actions, logProbs, adv, ret);
+      // lightweight metrics
+      this.lastAvgReward = rewards.length ? rewards.reduce((a,b)=>a+b,0) / rewards.length : 0;
 
-      socketBus.emit(TRAIN_PROGRESS_EVENT, { phase: 'batch', loss: 0, epoch: this.step, message: 'ppo update', ts: new Date().toISOString() });
+      // optimize policy with minibatches
+      const upd = await this.update(obs, actions, logProbs, adv, ret);
+
+      // stash latest losses
+      this.lastPolicyLoss = upd.policyLoss;
+      this.lastValueLoss = upd.valueLoss;
+      this.lastEntropy = upd.entropy;
+
+      socketBus.emit(TRAIN_PROGRESS_EVENT, { phase: 'batch', loss: 0, epoch: this.step, message: 'ppo update', avgReward: this.lastAvgReward, policyLoss: this.lastPolicyLoss, valueLoss: this.lastValueLoss, entropy: this.lastEntropy, ts: new Date().toISOString() });
 
       if (this.step % (this.h.rolloutSteps * 10) === 0) {
         await this.saveCheckpoint();
@@ -113,9 +127,10 @@ export class PPOTrainer {
   pause() { this.state = 'paused'; }
   resume() { if (this.state === 'paused') this.state = 'running'; }
   stop() { this.state = 'stopping'; }
-  status() { return { state: this.state, step: this.step, ckptDir: this.ckptDir }; }
+  status() { return { state: this.state, step: this.step, ckptDir: this.ckptDir, avgReward: this.lastAvgReward, policyLoss: this.lastPolicyLoss, valueLoss: this.lastValueLoss, entropy: this.lastEntropy }; }
+  getState() { return this.state; }
 
-  private async update(obs: number[][][], actions: number[], logProbsOld: number[], adv: number[], ret: number[]) {
+  private async update(obs: number[][][], actions: number[], logProbsOld: number[], adv: number[], ret: number[]): Promise<{ policyLoss: number; valueLoss: number; entropy: number; }> {
     // normalize advantages
     const mean = adv.reduce((a,b)=>a+b,0)/adv.length;
     const std = Math.sqrt(adv.reduce((a,b)=>a+(b-mean)*(b-mean),0)/adv.length + 1e-8);
@@ -123,6 +138,7 @@ export class PPOTrainer {
 
     const N = obs.length;
     const idxs = [...Array(N).keys()];
+    let plSum = 0, vlSum = 0, entSum = 0, batches = 0;
     for (let epoch = 0; epoch < this.h.epochs; epoch++) {
       shuffle(idxs);
       for (let i = 0; i < N; i += this.h.minibatchSize) {
@@ -133,6 +149,7 @@ export class PPOTrainer {
         const advT = tf.tensor(mbIdx.map(j => advNorm[j]));
         const retT = tf.tensor(mbIdx.map(j => ret[j]));
 
+        let policyLossVal = 0, valueLossVal = 0, entropyVal = 0;
         const loss = await this.optimizer.minimize(() => {
           const [logits, values] = this.model.apply(x, { training: true }) as tf.Tensor[];
           const logp = logProbFromLogits(logits, a);
@@ -144,13 +161,27 @@ export class PPOTrainer {
           const vLoss = tf.losses.meanSquaredError(retT, values.squeeze());
           const entropy = categoricalEntropy(logits).mean();
           const total = policyLoss.add(vLoss.mul(this.h.valueCoef)).sub(entropy.mul(this.h.entropyCoef));
+
+          // capture scalar values for metrics
+          // Note: .dataSync()[0] is used minimally per minibatch for monitoring only
+          policyLossVal = (policyLoss as tf.Scalar).dataSync()[0] as number;
+          valueLossVal = (vLoss as tf.Scalar).dataSync()[0] as number;
+          entropyVal = (entropy as tf.Scalar).dataSync()[0] as number;
           return total as tf.Scalar;
         }, true);
 
         loss?.dispose();
         x.dispose(); a.dispose(); oldLp.dispose(); advT.dispose(); retT.dispose();
+
+        plSum += policyLossVal;
+        vlSum += valueLossVal;
+        entSum += entropyVal;
+        batches++;
       }
     }
+
+    const avg = (x: number) => batches > 0 ? x / batches : 0;
+    return { policyLoss: avg(plSum), valueLoss: avg(vlSum), entropy: avg(entSum) };
   }
 
   private async saveCheckpoint() {

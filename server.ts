@@ -11,6 +11,11 @@ import { startDataBackfillWorker } from '@/workers/data-backfill-worker';
 import { startDataExportWorker } from '@/workers/data-export-worker';
 import { startDataWindowsWorker } from '@/workers/data-windows-worker';
 import { startCoverageWorker, scheduleCoverageTick } from '@/workers/coverage-worker';
+import { startRLWorker } from '@/workers/rl-worker';
+import { startExecutionWorker } from '@/workers/execution-worker';
+import { startOrderPoller } from '@/workers/order-poller';
+import { startMarketStreamer } from '@/workers/market-streamer';
+import { startTpSlWatcher } from '@/workers/tp-sl-watcher';
 
 const dev = process.env.NODE_ENV !== 'production';
 const currentPort = CONFIG.PORT;
@@ -65,11 +70,26 @@ async function createCustomServer() {
       // Start BullMQ supervised training worker
       startSupervisedWorker();
       console.log('> Workers: supervised training worker started');
+      // Start RL worker
+      startRLWorker();
+      console.log('> Workers: RL worker started');
       // Start data workers
       startDataBackfillWorker();
       startDataExportWorker();
       startDataWindowsWorker();
       console.log('> Workers: data workers started (backfill/export/windows)');
+      // Start execution worker
+      startExecutionWorker();
+      console.log('> Workers: broker execution worker started');
+      // Start order poller
+      startOrderPoller();
+      console.log('> Workers: order poller started');
+      // Start market streamer
+      startMarketStreamer();
+      console.log('> Workers: market streamer started');
+      // Start TP/SL watcher
+      startTpSlWatcher();
+      console.log('> Workers: TP/SL watcher started');
       // Start coverage worker and schedule repeatable tick
       startCoverageWorker();
       scheduleCoverageTick();

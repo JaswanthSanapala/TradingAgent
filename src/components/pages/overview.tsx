@@ -5,6 +5,8 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { BarChart3, ArrowDownRight, ArrowUpRight, RefreshCw } from "lucide-react";
 import { io, Socket } from "socket.io-client";
+import { ResponsiveContainer, LineChart, Line, XAxis, YAxis, Tooltip, ReferenceLine } from "recharts";
+import { toast } from "@/hooks/use-toast";
 
 type MarketItem = { key: string; label: string; symbol: string; changePct: number; marketState: string };
 type MarketPayload = { success: boolean; isOpen: boolean; data: MarketItem[] };
@@ -39,6 +41,12 @@ export default function OverviewPage() {
   const [perf, setPerf] = useState<PerformancePayload | null>(null);
   const [dash, setDash] = useState<DashboardPayload | null>(null);
   const [live, setLive] = useState<any[]>([]);
+  const [tickers, setTickers] = useState<Record<string, { price: number; ts: string }>>({});
+  const [train, setTrain] = useState<{ phase?: string; avgReward?: number; policyLoss?: number; valueLoss?: number; entropy?: number; message?: string; epoch?: number; ts?: string } | null>(null);
+  const [selectedSymbol, setSelectedSymbol] = useState<string>("");
+  const [tickHistory, setTickHistory] = useState<Record<string, Array<{ t: number; p: number }>>>({});
+  const [selectedTf, setSelectedTf] = useState<'1m' | '5m'>('1m');
+  const [showMarkers, setShowMarkers] = useState<boolean>(true);
   const [loading, setLoading] = useState(false);
   const [perfTab, setPerfTab] = useState<'daily' | 'monthly'>('daily');
   const socketRef = useRef<Socket | null>(null);
@@ -65,32 +73,77 @@ export default function OverviewPage() {
     loadAll();
   }, []);
 
-  // Socket.IO: live trade created updates
+  // Socket.IO: market ticks, orders/trades, and training progress
   useEffect(() => {
     if (!socketRef.current) {
       socketRef.current = io({ path: "/api/socketio" });
     }
     const s = socketRef.current;
-    const onCreated = (t: any) => {
-      setLive((prev) => [{
-        id: t.id,
-        agentId: t.agentId,
-        strategyId: t.strategyId,
-        entryTime: t.entryTime,
-        entryPrice: t.entryPrice,
-        stopLoss: t.stopLoss,
-        takeProfit: t.takeProfit,
-        action: t.action,
-        symbol: t.symbol,
-        timeframe: t.timeframe,
-        status: 'open',
-      }, ...prev]);
-      // also refresh dashboard quick metrics
+    const onTick = (p: { symbol: string; price: number; ts: string }) => {
+      setTickers((prev) => ({ ...prev, [p.symbol]: { price: p.price, ts: p.ts } }));
+      setTickHistory((prev) => {
+        const arr = prev[p.symbol] ? [...prev[p.symbol]] : [];
+        arr.push({ t: Date.parse(p.ts) || Date.now(), p: p.price });
+        if (arr.length > 200) arr.splice(0, arr.length - 200);
+        return { ...prev, [p.symbol]: arr };
+      });
+    };
+    const onOrder = (e: any) => {
+      // Minimal: just refresh dashboard on significant order updates
+      if (e?.phase === 'placed' || e?.phase === 'canceled' || e?.phase === 'oco_submitted' || e?.phase === 'pending') {
+        fetch("/api/overview/dashboard", { cache: "no-store" }).then(r => r.json()).then(j => { if (j?.success) setDash(j); }).catch(() => {});
+      }
+      // Toasts for quick feedback
+      if (e?.phase === 'tp_sl_trigger') {
+        toast({ title: 'TP/SL Triggered', description: `${e.symbol} ${e.hitTP ? 'TP' : ''}${e.hitTP && e.hitSL ? ' & ' : ''}${e.hitSL ? 'SL' : ''} at ${Number(e.price).toFixed(2)}` });
+      } else if (e?.phase === 'filled') {
+        toast({ title: 'Order Filled', description: `${e.symbol} order ${e.orderId || ''}` });
+      } else if (e?.phase === 'oco_submitted') {
+        toast({ title: 'OCO Submitted', description: `${e.symbol} TP ${Number(e.tp).toFixed(2)} / SL ${Number(e.sl).toFixed(2)}` });
+      }
+    };
+    const onTrade = (e: any) => {
+      // e.type: 'opened' | 'closed'
+      if (e?.type === 'opened') {
+        setLive((prev) => [{
+          id: e.id || `${e.symbol}-${e.ts}`,
+          agentId: e.agentId,
+          strategyId: e.strategyId,
+          entryTime: e.ts,
+          entryPrice: e.entryPrice,
+          stopLoss: e.stopLoss,
+          takeProfit: e.takeProfit,
+          action: 'buy',
+          symbol: e.symbol,
+          timeframe: e.timeframe || '-',
+          status: 'open',
+        }, ...prev]);
+      } else if (e?.type === 'closed') {
+        setLive((prev) => prev.map((t) => t.symbol === e.symbol && t.status === 'open' ? { ...t, status: 'closed', exitPrice: e.exitPrice, pnl: e.pnl, pnlPct: e.pnlPct } : t));
+      }
+      // refresh dashboard quick metrics
       fetch("/api/overview/dashboard", { cache: "no-store" }).then(r => r.json()).then(j => { if (j?.success) setDash(j); }).catch(() => {});
     };
-    s.on('TRADE_CREATED_EVENT', onCreated);
-    return () => { s.off('TRADE_CREATED_EVENT', onCreated); };
+    const onTrain = (e: any) => { setTrain(e); };
+    s.on('market:tick', onTick);
+    s.on('order:updated', onOrder);
+    s.on('trade:updated', onTrade);
+    s.on('train:progress', onTrain);
+    return () => {
+      s.off('market:tick', onTick);
+      s.off('order:updated', onOrder);
+      s.off('trade:updated', onTrade);
+      s.off('train:progress', onTrain);
+    };
   }, []);
+
+  // Auto-select first available symbol for chart when ticks arrive
+  useEffect(() => {
+    if (!selectedSymbol) {
+      const keys = Object.keys(tickers);
+      if (keys.length > 0) setSelectedSymbol(keys[0]);
+    }
+  }, [tickers, selectedSymbol]);
 
   const isMarketOpen = market?.isOpen ?? false;
 
@@ -180,27 +233,69 @@ export default function OverviewPage() {
         {/* Market Status */}
         <Card className="mb-8">
           <CardHeader>
-            <CardTitle className="flex items-center justify-between">
-              <span>Market Status</span>
-              <Badge variant={isMarketOpen ? "secondary" : "destructive"} className="text-xs">
-                {isMarketOpen ? "Open" : "Closed"}
-              </Badge>
+            <CardTitle className="flex items-center justify-between gap-2">
+              <span>Live Price</span>
+              <div className="flex items-center gap-2">
+                <select
+                  className="text-xs border rounded px-2 py-1 bg-white dark:bg-slate-900"
+                  value={selectedSymbol}
+                  onChange={(e) => setSelectedSymbol(e.target.value)}
+                >
+                  {Object.keys(tickers).length === 0 ? (
+                    <option value="">No ticks</option>
+                  ) : (
+                    Object.keys(tickers).map((sym) => (
+                      <option key={sym} value={sym}>{sym}</option>
+                    ))
+                  )}
+                </select>
+                <select
+                  className="text-xs border rounded px-2 py-1 bg-white dark:bg-slate-900"
+                  value={selectedTf}
+                  onChange={(e) => setSelectedTf(e.target.value as any)}
+                >
+                  <option value="1m">1m</option>
+                  <option value="5m">5m</option>
+                </select>
+                <label className="flex items-center gap-1 text-xs">
+                  <input type="checkbox" checked={showMarkers} onChange={(e) => setShowMarkers(e.target.checked)} />
+                  SL/TP
+                </label>
+              </div>
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="space-y-2">
-              {(market?.data || []).map((row) => {
-                const up = Number(row.changePct || 0) >= 0;
-                return (
-                  <div key={row.key} className="flex justify-between text-sm">
-                    <span className="text-slate-600 dark:text-slate-400">{row.label}</span>
-                    <span className={`font-medium flex items-center ${up ? 'text-green-600' : 'text-red-600'}`}>
-                      {up ? <ArrowUpRight className="h-4 w-4 mr-1" /> : <ArrowDownRight className="h-4 w-4 mr-1" />} {up ? '+' : ''}{Number(row.changePct || 0).toFixed(2)}%
-                    </span>
-                  </div>
-                );
-              })}
-            </div>
+            {selectedSymbol && (tickHistory[selectedSymbol]?.length || 0) > 1 ? (
+              <div className="h-40">
+                <ResponsiveContainer width="100%" height="100%">
+                  {(() => {
+                    const windowMs = selectedTf === '1m' ? 60_000 : 5 * 60_000;
+                    const now = Date.now();
+                    const data = (tickHistory[selectedSymbol] || []).filter(d => d.t >= now - windowMs).map(d => ({ x: d.t, y: d.p }));
+                    // Find an open trade for the selected symbol for SL/TP markers
+                    const openTrade = live.find((t) => t.symbol === selectedSymbol && t.status === 'open');
+                    const sl = openTrade?.stopLoss ? Number(openTrade.stopLoss) : undefined;
+                    const tp = openTrade?.takeProfit ? Number(openTrade.takeProfit) : undefined;
+                    return (
+                      <LineChart data={data} margin={{ left: 8, right: 8, top: 8, bottom: 8 }}>
+                        <XAxis dataKey="x" tickFormatter={(v) => new Date(v).toLocaleTimeString()} hide />
+                        <YAxis domain={["auto", "auto"]} width={40} tick={{ fontSize: 10 }} />
+                        <Tooltip formatter={(val: any) => Number(val).toFixed(2)} labelFormatter={(v: any) => new Date(v).toLocaleString()} />
+                        <Line type="monotone" dataKey="y" stroke="#0ea5e9" dot={false} strokeWidth={2} />
+                        {showMarkers && sl && (
+                          <ReferenceLine y={sl} stroke="#ef4444" strokeDasharray="4 4" label={{ value: `SL ${sl.toFixed(2)}`, position: 'insideTopRight', fontSize: 10, fill: '#ef4444' }} />
+                        )}
+                        {showMarkers && tp && (
+                          <ReferenceLine y={tp} stroke="#22c55e" strokeDasharray="4 4" label={{ value: `TP ${tp.toFixed(2)}`, position: 'insideTopRight', fontSize: 10, fill: '#22c55e' }} />
+                        )}
+                      </LineChart>
+                    );
+                  })()}
+                </ResponsiveContainer>
+              </div>
+            ) : (
+              <div className="text-sm text-slate-500">No data yet.</div>
+            )}
           </CardContent>
         </Card>
 

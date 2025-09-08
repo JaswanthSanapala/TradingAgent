@@ -58,6 +58,29 @@ export type SupervisedJobData = {
   walkForward?: { folds?: number; step?: number } | null;
 };
 
+// RL training job payload
+export type RLJobData = {
+  runId?: string;
+  agentId: string;
+  symbol: string;
+  timeframe: string;
+  window: number;
+  hparams?: {
+    gamma?: number;
+    gaeLambda?: number;
+    clipRatio?: number;
+    entropyCoef?: number;
+    valueCoef?: number;
+    lr?: number;
+    rolloutSteps?: number;
+    batchSize?: number;
+    minibatchSize?: number;
+    epochs?: number;
+  };
+  episode?: { steps?: number; start?: string; end?: string };
+  trainSeconds?: number; // wall-clock duration to train before auto-stop
+};
+
 export type BackfillJobData = {
   datasetId: string;
   from?: string; // ISO date
@@ -78,6 +101,31 @@ export type WindowsJobData = {
   stride?: number;
   maskRatio?: number;
 };
+
+// Broker execution jobs
+export type PlaceOrderJobData = {
+  action: 'place';
+  symbol: string; // e.g., BTC/USDT
+  side: 'buy' | 'sell';
+  type: 'market' | 'limit';
+  amount: number;
+  price?: number;
+  params?: Record<string, any>;
+  // optional metadata to persist Trade
+  agentId?: string;
+  strategyId?: string;
+  stopLoss?: number;
+  takeProfit?: number;
+};
+
+export type CancelOrderJobData = {
+  action: 'cancel';
+  orderId: string;
+  symbol: string;
+  params?: Record<string, any>;
+};
+
+export type BrokerJobData = PlaceOrderJobData | CancelOrderJobData;
 
 export const defaultJobOpts: JobsOptions = {
   attempts: 3,

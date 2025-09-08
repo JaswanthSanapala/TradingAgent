@@ -14,6 +14,7 @@ export default function AdminPage() {
         <SupervisedAgentsCard />
         <FeedbackSuggestionsCard />
         <CoverageCard />
+        <JobsCard />
       </div>
     </div>
   );
@@ -379,6 +380,60 @@ function CoverageCard() {
           </li>
         ))}
       </ul>
+    </Card>
+  );
+}
+
+function JobsCard() {
+  const [datasetId, setDatasetId] = useState('');
+  const [jobs, setJobs] = useState<any[]>([]);
+  const [loading, setLoading] = useState(false);
+  const load = async () => {
+    if (!datasetId) return alert('Enter dataset (CoverageManifest) id');
+    setLoading(true);
+    try {
+      const res = await fetch(`/api/datasets/${encodeURIComponent(datasetId)}/jobs`);
+      const json = await res.json();
+      setJobs(json.jobs || []);
+    } finally { setLoading(false); }
+  };
+  return (
+    <Card title="Ingest Jobs" onSubmit={load} loading={loading}>
+      <div className="grid grid-cols-2 gap-2">
+        <label className="text-sm col-span-2">
+          <div className="text-gray-600 mb-1">datasetId</div>
+          <input className="w-full border rounded px-2 py-1" value={datasetId} onChange={(e)=>setDatasetId(e.target.value)} />
+        </label>
+      </div>
+      <div className="mt-3 max-h-64 overflow-auto border rounded">
+        <table className="w-full text-sm">
+          <thead className="bg-gray-50">
+            <tr>
+              <th className="p-2 text-left">id</th>
+              <th className="p-2 text-left">status</th>
+              <th className="p-2 text-left">range</th>
+              <th className="p-2 text-left">inserted</th>
+              <th className="p-2 text-left">started</th>
+              <th className="p-2 text-left">finished</th>
+            </tr>
+          </thead>
+          <tbody>
+            {jobs.map((j:any) => (
+              <tr key={j.id} className="border-t">
+                <td className="p-2 font-mono text-xs">{j.id}</td>
+                <td className="p-2">{j.status}</td>
+                <td className="p-2 text-xs">{new Date(j.rangeStart).toISOString()} → {new Date(j.rangeEnd).toISOString()}</td>
+                <td className="p-2">{j.inserted}</td>
+                <td className="p-2 text-xs">{j.startedAt ? new Date(j.startedAt).toISOString() : '—'}</td>
+                <td className="p-2 text-xs">{j.finishedAt ? new Date(j.finishedAt).toISOString() : '—'}</td>
+              </tr>
+            ))}
+            {jobs.length === 0 && (
+              <tr><td className="p-3 text-gray-500" colSpan={6}>No jobs loaded. Enter a dataset id and click Run.</td></tr>
+            )}
+          </tbody>
+        </table>
+      </div>
     </Card>
   );
 }

@@ -6,6 +6,8 @@ import type { StrategySource, StrategyAction } from '@/lib/strategy-provider';
 import { TsPluginStrategyProvider } from '@/lib/strategy-ts-plugin';
 import { BacktestEngine } from '@/lib/backtest-engine';
 import { buildFeatures } from '@/lib/ml-utils';
+import { registerArtifact, promote, prune } from '@/lib/model-registry';
+import { makeSupervisedMetrics } from '@/lib/metrics';
 
 export type SupervisedTrainOptions = {
   agentId: string;
@@ -424,6 +426,14 @@ export async function trainSupervised(opts: SupervisedTrainOptions & { learningR
     fs.writeFileSync(path.join(saveDir, 'scaler.json'), JSON.stringify({ ...scaler, lookback: opts.lookback, featDim }, null, 2));
   } catch {}
 
+  // Model Registry: register artifact, promote latest, prune older versions
+  try {
+    const version = path.basename(saveDir);
+    registerArtifact({ agentId: opts.agentId, version, dir: saveDir, type: 'supervised', metrics: { loss, acc, testAcc } });
+    promote({ agentId: opts.agentId, version, stage: 'latest' });
+    prune({ agentId: opts.agentId, keep: 5 });
+  } catch {}
+
   // Update agent modelPath
   await prisma.agent.update({ where: { id: opts.agentId }, data: { modelPath: saveDir } });
 
@@ -432,7 +442,15 @@ export async function trainSupervised(opts: SupervisedTrainOptions & { learningR
       agentId: opts.agentId,
       runType: 'supervised',
       params: { ...opts, symbol: opts.symbol, timeframe: opts.timeframe, architecture: arch },
-      metrics: { loss, acc, testAcc },
+      metrics: makeSupervisedMetrics({
+        loss,
+        acc,
+        testAcc,
+        samples: { train: train.X.length, val: val.X.length, test: test.X.length },
+        artifactPath: saveDir,
+        epochs: opts.epochs,
+        algorithm: 'supervised',
+      }),
       artifactPath: saveDir,
       status: 'completed',
     },
