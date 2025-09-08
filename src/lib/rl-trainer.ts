@@ -1,4 +1,6 @@
-import * as tf from '@tensorflow/tfjs-node';
+import type * as tft from '@tensorflow/tfjs';
+let tf: any;
+try { tf = require('@tensorflow/tfjs-node'); } catch { tf = require('@tensorflow/tfjs'); }
 import { TradingEnv, EnvConfig, Action } from './rl-env';
 import { socketBus, TRAIN_PROGRESS_EVENT } from '@/lib/socket-bus';
 import { mkdirSync, existsSync } from 'fs';
@@ -22,8 +24,8 @@ export class PPOTrainer {
   private agentId: string;
   private env: TradingEnv;
   private h: PPOHyperParams;
-  private model: tf.LayersModel;
-  private optimizer: tf.Optimizer;
+  private model: tft.LayersModel;
+  private optimizer: tft.Optimizer;
   private state: TrainerState = 'idle';
   private step = 0;
   private version = 1;
@@ -43,15 +45,15 @@ export class PPOTrainer {
     if (!existsSync(this.ckptDir)) mkdirSync(this.ckptDir, { recursive: true });
   }
 
-  private buildModel(window: number): tf.LayersModel {
+  private buildModel(window: number): tft.LayersModel {
     const feat = 9; // must match env
     const input = tf.input({ shape: [window, feat] });
-    const x1 = tf.layers.conv1d({ filters: 32, kernelSize: 3, activation: 'relu', padding: 'causal' }).apply(input) as tf.SymbolicTensor;
-    const x2 = tf.layers.conv1d({ filters: 32, kernelSize: 5, activation: 'relu', padding: 'causal' }).apply(x1) as tf.SymbolicTensor;
-    const x3 = tf.layers.gru({ units: 32, returnSequences: false }).apply(x2) as tf.SymbolicTensor;
-    const trunk = tf.layers.dense({ units: 64, activation: 'relu' }).apply(x3) as tf.SymbolicTensor;
-    const policy = tf.layers.dense({ units: 4, activation: 'linear', name: 'policy' }).apply(trunk) as tf.SymbolicTensor;
-    const value = tf.layers.dense({ units: 1, activation: 'linear', name: 'value' }).apply(trunk) as tf.SymbolicTensor;
+    const x1 = tf.layers.conv1d({ filters: 32, kernelSize: 3, activation: 'relu', padding: 'causal' }).apply(input) as any;
+    const x2 = tf.layers.conv1d({ filters: 32, kernelSize: 5, activation: 'relu', padding: 'causal' }).apply(x1) as any;
+    const x3 = tf.layers.gru({ units: 32, returnSequences: false }).apply(x2) as any;
+    const trunk = tf.layers.dense({ units: 64, activation: 'relu' }).apply(x3) as any;
+    const policy = tf.layers.dense({ units: 4, activation: 'linear', name: 'policy' }).apply(trunk) as any;
+    const value = tf.layers.dense({ units: 1, activation: 'linear', name: 'value' }).apply(trunk) as any;
     return tf.model({ inputs: input, outputs: [policy, value] });
   }
 
@@ -79,7 +81,7 @@ export class PPOTrainer {
       obs.length = 0; actions.length = 0; logProbs.length = 0; rewards.length = 0; values.length = 0; dones.length = 0;
       for (let t = 0; t < this.h.rolloutSteps; t++) {
         const s = tf.tensor(sArr, [window, 9]);
-        const [logitsT, valueT] = this.model.predict(s.expandDims(0)) as tf.Tensor[];
+        const [logitsT, valueT] = this.model.predict(s.expandDims(0)) as tft.Tensor[];
         const logits = (await logitsT.array()) as number[][];
         const value = (await valueT.array()) as number[][];
         const { act, lp } = sampleActionAndLogProb(logits[0]);
@@ -151,7 +153,7 @@ export class PPOTrainer {
 
         let policyLossVal = 0, valueLossVal = 0, entropyVal = 0;
         const loss = await this.optimizer.minimize(() => {
-          const [logits, values] = this.model.apply(x, { training: true }) as tf.Tensor[];
+          const [logits, values] = this.model.apply(x, { training: true }) as tft.Tensor[];
           const logp = logProbFromLogits(logits, a);
           const ratio = tf.exp(logp.sub(oldLp));
           const clip1 = ratio.mul(advT);
@@ -164,10 +166,10 @@ export class PPOTrainer {
 
           // capture scalar values for metrics
           // Note: .dataSync()[0] is used minimally per minibatch for monitoring only
-          policyLossVal = (policyLoss as tf.Scalar).dataSync()[0] as number;
-          valueLossVal = (vLoss as tf.Scalar).dataSync()[0] as number;
-          entropyVal = (entropy as tf.Scalar).dataSync()[0] as number;
-          return total as tf.Scalar;
+          policyLossVal = (policyLoss as any).dataSync()[0] as number;
+          valueLossVal = (vLoss as any).dataSync()[0] as number;
+          entropyVal = (entropy as any).dataSync()[0] as number;
+          return total as any;
         }, true);
 
         loss?.dispose();
@@ -202,15 +204,15 @@ function sampleActionAndLogProb(logits: number[]): { act: number; lp: number } {
   return { act: idx, lp };
 }
 
-function logProbFromLogits(logits: tf.Tensor, actions: tf.Tensor): tf.Tensor {
-  const logProbs = tf.logSoftmax(logits as tf.Tensor2D);
-  const oneHot = tf.oneHot(actions as tf.Tensor1D, (logits.shape[1] as number));
+function logProbFromLogits(logits: tft.Tensor, actions: tft.Tensor): tft.Tensor {
+  const logProbs = tf.logSoftmax(logits as any);
+  const oneHot = tf.oneHot(actions as any, (logits.shape[1] as number));
   return logProbs.mul(oneHot).sum(-1);
 }
 
-function categoricalEntropy(logits: tf.Tensor): tf.Tensor {
-  const logProbs = tf.logSoftmax(logits as tf.Tensor2D);
-  const probs = tf.softmax(logits as tf.Tensor2D);
+function categoricalEntropy(logits: tft.Tensor): tft.Tensor {
+  const logProbs = tf.logSoftmax(logits as any);
+  const probs = tf.softmax(logits as any);
   return tf.neg(probs.mul(logProbs).sum(-1));
 }
 

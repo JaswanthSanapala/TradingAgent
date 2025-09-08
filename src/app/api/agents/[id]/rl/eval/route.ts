@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import * as tf from '@tensorflow/tfjs-node';
+let tf: any; try { tf = require('@tensorflow/tfjs-node'); } catch { tf = require('@tensorflow/tfjs'); }
 import { loadLatestCheckpoint, inferAction } from '@/lib/rl-infer';
 import { TradingEnv, EnvConfig } from '@/lib/rl-env';
 

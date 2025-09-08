@@ -1,4 +1,5 @@
-import * as tf from '@tensorflow/tfjs-node';
+import type * as tft from '@tensorflow/tfjs';
+let tf: any; try { tf = require('@tensorflow/tfjs-node'); } catch { tf = require('@tensorflow/tfjs'); }
 import fs from 'fs';
 import path from 'path';
 
@@ -53,7 +54,7 @@ export async function predictAction(modelPath: string, window: number[][]) {
   }
 
   const input = tf.tensor3d([normWindow]);
-  const logits = model.predict(input) as tf.Tensor;
+  const logits = model.predict(input) as tft.Tensor;
   const arr = (await logits.array()) as number[][];
   input.dispose(); logits.dispose();
   const probs = softmax(arr[0]);

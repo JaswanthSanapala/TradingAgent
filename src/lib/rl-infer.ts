@@ -1,13 +1,14 @@
-import * as tf from '@tensorflow/tfjs-node';
+import type * as tft from '@tensorflow/tfjs';
+let tf: any; try { tf = require('@tensorflow/tfjs-node'); } catch { tf = require('@tensorflow/tfjs'); }
 import { TradingEnv } from './rl-env';
 
-export async function loadLatestCheckpoint(path: string): Promise<tf.LayersModel> {
+export async function loadLatestCheckpoint(path: string): Promise<tft.LayersModel> {
   return await tf.loadLayersModel(`file://${path}/model.json`);
 }
 
-export async function inferAction(model: tf.LayersModel, state: Float32Array, window: number, mask?: boolean[]) {
+export async function inferAction(model: tft.LayersModel, state: Float32Array, window: number, mask?: boolean[]) {
   const x = tf.tensor(state, [window, 9]).expandDims(0);
-  const [logitsT] = model.predict(x) as tf.Tensor[];
+  const [logitsT] = model.predict(x) as tft.Tensor[];
   let logits = await logitsT.array() as number[][];
   const l = logits[0].slice();
   if (mask && mask.length === l.length) {

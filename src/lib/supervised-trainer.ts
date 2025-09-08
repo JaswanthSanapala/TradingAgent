@@ -1,4 +1,5 @@
-import * as tf from '@tensorflow/tfjs-node';
+import type * as tft from '@tensorflow/tfjs';
+let tf: any; try { tf = require('@tensorflow/tfjs-node'); } catch { tf = require('@tensorflow/tfjs'); }
 import path from 'path';
 import fs from 'fs';
 import { prisma } from '@/lib/db';
@@ -94,9 +95,9 @@ export async function trainWalkForward(opts: SupervisedTrainOptions & {
     if (testN.X.length > 0) {
       const xtest = tf.tensor3d(testN.X);
       const ytestT = tf.tensor2d(testN.y.map((c) => (c === 0 ? [1, 0, 0] : c === 1 ? [0, 1, 0] : [0, 0, 1])));
-      const evalRes = model.evaluate(xtest, ytestT, { verbose: 0 }) as tf.Scalar | tf.Tensor[];
+      const evalRes = model.evaluate(xtest, ytestT, { verbose: 0 }) as tft.Scalar | tft.Tensor[];
       if (Array.isArray(evalRes)) {
-        const accTensor = evalRes[1] as tf.Scalar;
+        const accTensor = evalRes[1] as tft.Scalar;
         testAcc = (await accTensor.data())[0];
       }
       xtest.dispose(); ytestT.dispose();
@@ -410,9 +411,9 @@ export async function trainSupervised(opts: SupervisedTrainOptions & { learningR
   if (test.X.length > 0) {
     const xtest = tf.tensor3d(test.X);
     const ytest = tf.tensor2d(test.y.map((c) => (c === 0 ? [1, 0, 0] : c === 1 ? [0, 1, 0] : [0, 0, 1])));
-    const evalRes = model.evaluate(xtest, ytest, { verbose: 0 }) as tf.Scalar | tf.Tensor[];
+    const evalRes = model.evaluate(xtest, ytest, { verbose: 0 }) as tft.Scalar | tft.Tensor[];
     if (Array.isArray(evalRes)) {
-      const accTensor = evalRes[1] as tf.Scalar;
+      const accTensor = evalRes[1] as tft.Scalar;
       testAcc = (await accTensor.data())[0];
     }
     xtest.dispose(); ytest.dispose();

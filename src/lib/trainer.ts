@@ -1,7 +1,8 @@
 import fs from 'fs';
 import fsp from 'fs/promises';
 import path from 'path';
-import * as tf from '@tensorflow/tfjs-node';
+import type * as tft from '@tensorflow/tfjs';
+let tf: any; try { tf = require('@tensorflow/tfjs-node'); } catch { tf = require('@tensorflow/tfjs'); }
 import { logger } from '@/lib/logger';
 import { socketBus, TRAIN_PROGRESS_EVENT } from '@/lib/socket-bus';
 
@@ -100,8 +101,8 @@ export async function trainUnsupervised(params: TrainParams): Promise<{ savedMod
   socketBus.emit(TRAIN_PROGRESS_EVENT, { phase: 'done', message: `Model saved at ${savedModelPath}`, symbol, timeframe, windowSize, ts: new Date().toISOString() });
 
   // Optionally, compute embeddings for dataset (encoder output)
-  const encoder = (model as any).encoder as tf.LayersModel;
-  const emb = encoder.predict(xTensor) as tf.Tensor;
+  const encoder = (model as any).encoder as tft.LayersModel;
+  const emb = encoder.predict(xTensor) as tft.Tensor;
   // Encoder outputs shape [N, D], so `array()` resolves to number[][]
   const embArr = (await emb.array()) as number[][];
   const embPath = path.join(outDir, `${baseName}_embeddings.json`);
@@ -118,16 +119,16 @@ export async function trainUnsupervised(params: TrainParams): Promise<{ savedMod
 
 function buildMaskedAutoencoder(T: number) {
   const input = tf.input({ shape: [T] });
-  const x = tf.layers.reshape({ targetShape: [T, 1] }).apply(input) as tf.SymbolicTensor;
-  const h1 = tf.layers.conv1d({ filters: 16, kernelSize: 5, activation: 'relu', padding: 'same' }).apply(x) as tf.SymbolicTensor;
-  const h2 = tf.layers.conv1d({ filters: 32, kernelSize: 5, activation: 'relu', padding: 'same' }).apply(h1) as tf.SymbolicTensor;
-  const g1 = tf.layers.globalAveragePooling1d().apply(h2) as tf.SymbolicTensor;
-  const z = tf.layers.dense({ units: 32, activation: 'relu' }).apply(g1) as tf.SymbolicTensor;
-  const z2 = tf.layers.dense({ units: 64, activation: 'relu' }).apply(z) as tf.SymbolicTensor;
-  const up = tf.layers.repeatVector({ n: T }).apply(z2) as tf.SymbolicTensor;
-  const dec1 = tf.layers.lstm({ units: 32, returnSequences: true }).apply(up) as tf.SymbolicTensor;
-  const dec2 = tf.layers.timeDistributed({ layer: tf.layers.dense({ units: 1 }) }).apply(dec1) as tf.SymbolicTensor;
-  const out = tf.layers.reshape({ targetShape: [T] }).apply(dec2) as tf.SymbolicTensor;
+  const x = tf.layers.reshape({ targetShape: [T, 1] }).apply(input) as any;
+  const h1 = tf.layers.conv1d({ filters: 16, kernelSize: 5, activation: 'relu', padding: 'same' }).apply(x) as any;
+  const h2 = tf.layers.conv1d({ filters: 32, kernelSize: 5, activation: 'relu', padding: 'same' }).apply(h1) as any;
+  const g1 = tf.layers.globalAveragePooling1d().apply(h2) as any;
+  const z = tf.layers.dense({ units: 32, activation: 'relu' }).apply(g1) as any;
+  const z2 = tf.layers.dense({ units: 64, activation: 'relu' }).apply(z) as any;
+  const up = tf.layers.repeatVector({ n: T }).apply(z2) as any;
+  const dec1 = tf.layers.lstm({ units: 32, returnSequences: true }).apply(up) as any;
+  const dec2 = tf.layers.timeDistributed({ layer: tf.layers.dense({ units: 1 }) }).apply(dec1) as any;
+  const out = tf.layers.reshape({ targetShape: [T] }).apply(dec2) as any;
 
   const model = tf.model({ inputs: input, outputs: out });
   // Expose encoder for embeddings
@@ -136,8 +137,8 @@ function buildMaskedAutoencoder(T: number) {
   return model;
 }
 
-function maskedMSELoss(maskTensor: tf.Tensor2D) {
-  return (yTrue: tf.Tensor, yPred: tf.Tensor) => tf.tidy(() => {
+function maskedMSELoss(maskTensor: tft.Tensor2D) {
+  return (yTrue: tft.Tensor, yPred: tft.Tensor) => tf.tidy(() => {
     const mask = maskTensor; // [N, T]
     const diff = tf.mul(tf.sub(yTrue, yPred), mask);
     const mse = tf.mean(tf.square(diff));
