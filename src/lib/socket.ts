@@ -18,6 +18,14 @@ export const setupSocket = (io: Server) => {
     io.emit('TRADE_CREATED_EVENT', payload);
   });
 
+  // Relay market events
+  socketBus.on('market:tick', (payload) => {
+    io.emit('market:tick', payload);
+  });
+  socketBus.on('market:ohlcv', (payload) => {
+    io.emit('market:ohlcv', payload);
+  });
+
   io.on('connection', (socket) => {
     console.log('Client connected:', socket.id);
 

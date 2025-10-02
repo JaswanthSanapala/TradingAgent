@@ -2,7 +2,8 @@ import { prisma } from '@/lib/db';
 import { logger } from '@/lib/logger';
 import path from 'path';
 import fs from 'fs';
-import { predictAction, buildFeatures } from '@/lib/ml-utils';
+import { predictAction, buildFeaturesFromSpec } from '@/lib/ml-utils';
+import { buildMtfWindow, pickBaseTimeframe } from '@/lib/mtf';
 
 export interface BacktestConfig {
   startDate: Date;
@@ -200,7 +201,35 @@ export class BacktestEngine {
       const lb = agentModel.lookback as number;
       if (marketData.length < lb) return null;
       const windowRows = marketData.slice(-lb);
-      const window = windowRows.map((r: any) => buildFeatures({ ...r, ...(r as any).indicators?.[0] }));
+
+      // Read strategy metadata to determine indicators and MTF
+      const p: any = agentModel.strategy?.parameters || {};
+      const mtf: string[] | undefined = p?.compiled?.metadata?.mtf?.timeframes;
+      const indicators: string[] | undefined = p?.compiled?.metadata?.indicators;
+
+      let window: number[][];
+      if (mtf && mtf.length) {
+        // Build MTF features for the same symbol/timeframes; align to last timestamp
+        const symbol = windowRows[windowRows.length - 1].symbol as string;
+        const { baseTf, windows } = await buildMtfWindow({ symbol, timeframes: Array.from(new Set(mtf)), lookback: lb, limit: 5000, indicators: indicators || [], smcFeatures: [] });
+        if (!windows.length) return null;
+        window = windows[windows.length - 1].feats;
+      } else {
+        // Single timeframe: join only requested indicators by exact timestamp if present
+        const fields = indicators && indicators.length ? indicators : [];
+        let indMap: Map<number, any> | undefined;
+        if (fields.length) {
+          const tsList = windowRows.map((r: any) => r.timestamp);
+          const inds = await prisma.indicator.findMany({ where: { symbol: windowRows[0].symbol, timeframe: windowRows[0].timeframe, timestamp: { in: tsList } } });
+          indMap = new Map(inds.map(i => [i.timestamp.getTime(), i]));
+        }
+        window = windowRows.map((r: any) => {
+          if (!indMap || !fields.length) return buildFeaturesFromSpec(r, []);
+          const rowInd = indMap.get(r.timestamp.getTime());
+          return buildFeaturesFromSpec({ ...r, ...(rowInd || {}) }, fields);
+        });
+      }
+
       const { action, confidence } = await predictAction(agentModel.modelPath, window);
       return { action, confidence };
     } catch (error) {

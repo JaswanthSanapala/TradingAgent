@@ -85,12 +85,10 @@ export default function BacktestPage() {
       await backfillRes.json().catch(() => ({}));
 
       setStatusMsg("Running backtest...");
-      const runRes = await fetch("/api/backtest", {
+      const runRes = await fetch(`/api/agents/${selectedAgent.id}/backtest`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          agentId: selectedAgent.id,
-          strategyId: selectedAgent.strategyId,
           config: {
             startDate: new Date(startDate).toISOString(),
             endDate: new Date(endDate).toISOString(),

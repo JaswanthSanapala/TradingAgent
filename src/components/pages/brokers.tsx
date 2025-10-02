@@ -18,6 +18,8 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import { ArrowUpRight, ArrowDownRight, Banknote, Plus, Users } from "lucide-react";
+import { Switch } from "@/components/ui/switch";
+import { toast } from "sonner";
 
 type BrokerName = "Mock" | "Zerodha" | "Upstox" | "Angel One" | "Dhan" | "Fyers";
 
@@ -127,15 +129,40 @@ export default function BrokersPage() {
   const [open, setOpen] = useState(false);
   const [adding, setAdding] = useState(false);
 
-  // Form state
+  // Real broker config state (DB-backed)
+  const [provider, setProvider] = useState<string>("binance");
+  const [apiKey, setApiKey] = useState<string>("");
+  const [apiSecret, setApiSecret] = useState<string>("");
+  const [sandbox, setSandbox] = useState<boolean>(true);
+  const [savingCfg, setSavingCfg] = useState<boolean>(false);
+  const [testing, setTesting] = useState<boolean>(false);
+  const [balances, setBalances] = useState<any | null>(null);
+
+  // Form state (local mock connections UI)
   const [broker, setBroker] = useState<BrokerName>("Mock");
   const [clientId, setClientId] = useState("");
-  const [apiKey, setApiKey] = useState("");
-  const [apiSecret, setApiSecret] = useState("");
+  const [mockApiKey, setMockApiKey] = useState("");
+  const [mockApiSecret, setMockApiSecret] = useState("");
   const [accessToken, setAccessToken] = useState("");
 
   useEffect(() => {
     setConnections(loadConnections());
+  }, []);
+
+  // Load active broker config from server
+  useEffect(() => {
+    (async () => {
+      try {
+        const res = await fetch('/api/broker/config', { cache: 'no-store' });
+        const json = await res.json();
+        if (json?.success && json.config) {
+          setProvider(json.config.provider || 'binance');
+          setApiKey(json.config.apiKey || '');
+          setApiSecret(json.config.apiSecret || '');
+          setSandbox(!!json.config.sandbox);
+        }
+      } catch {}
+    })();
   }, []);
 
   useEffect(() => {
@@ -165,8 +192,8 @@ export default function BrokersPage() {
       setConnections((prev) => [conn, ...prev]);
       // reset
       setClientId("");
-      setApiKey("");
-      setApiSecret("");
+      setMockApiKey("");
+      setMockApiSecret("");
       setAccessToken("");
       setAdding(false);
       setOpen(false);

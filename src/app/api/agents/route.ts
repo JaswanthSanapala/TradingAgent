@@ -74,7 +74,7 @@ export async function POST(request: NextRequest) {
       });
     }
 
-    // Create the agent with initial performance progress = 0
+    // Create the agent with initial performance status 'untrained' (no auto-training)
     const agentName = `${strategy.name} Agent`;
     const agent = await prisma.agent.create({
       data: {
@@ -87,44 +87,13 @@ export async function POST(request: NextRequest) {
           strategyIR: compiled,
           strategyOrigin: compiled?.origin,
         },
-        performance: { progress: 0, status: 'queued' },
+        performance: { progress: 0, status: 'untrained' },
         strategyId: strategy.id,
         userId: user.id,
       },
     });
 
-    // Create a TrainingRun placeholder with status 'running' once job starts
-    const trainingRun = await prisma.trainingRun.create({
-      data: {
-        agentId: agent.id,
-        runType: 'supervised',
-        params: { createdFrom: 'api/agents', defaulted: true },
-        status: 'running',
-      },
-    });
-
-    // Enqueue supervised training job with sensible defaults for now
-    const jobData: SupervisedJobData = {
-      runId: trainingRun.id,
-      agentId: agent.id,
-      strategyId: strategy.id,
-      symbol: 'BTC/USDT',
-      timeframe: '1h',
-      lookback: 64,
-      lookahead: 1,
-      limit: 5000,
-      epochs: 8,
-      batchSize: 64,
-      labelingMode: 'future_return',
-      ratios: { train: 0.8, val: 0.1, test: 0.1 },
-      walkForward: null,
-    };
-
-    const job = await queues.train_supervised.add('supervised_train', jobData, defaultJobOpts);
-
-    await prisma.agent.update({ where: { id: agent.id }, data: { performance: { progress: 0, status: 'training', jobId: job.id } } });
-
-    return NextResponse.json({ success: true, agent, runId: trainingRun.id, jobId: job.id });
+    return NextResponse.json({ success: true, agent });
   } catch (error) {
     console.error('Error creating agent:', error);
     return NextResponse.json({ success: false, error: 'Failed to create agent' }, { status: 500 });

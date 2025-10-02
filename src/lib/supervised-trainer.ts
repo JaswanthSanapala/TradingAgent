@@ -1,14 +1,49 @@
 import type * as tft from '@tensorflow/tfjs';
 let tf: any; try { tf = require('@tensorflow/tfjs-node'); } catch { tf = require('@tensorflow/tfjs'); }
+
+async function getStrategyIndicators(strategyId: string): Promise<string[] | undefined> {
+  try {
+    const s = await prisma.strategy.findUnique({ where: { id: strategyId }, select: { parameters: true } });
+    const p: any = s?.parameters || {};
+    const inds: string[] | undefined = p?.compiled?.metadata?.indicators;
+    if (Array.isArray(inds) && inds.length) return Array.from(new Set(inds.map(x => String(x))));
+  } catch {}
+  return undefined;
+}
+
+async function getSmcFeatures(strategyId: string): Promise<string[] | undefined> {
+  try {
+    const s = await prisma.strategy.findUnique({ where: { id: strategyId }, select: { parameters: true } });
+    const p: any = s?.parameters || {};
+    const feats: string[] | undefined = p?.compiled?.metadata?.smc?.features;
+    if (Array.isArray(feats) && feats.length) return Array.from(new Set(feats.map(x => String(x))));
+  } catch {}
+  return undefined;
+}
 import path from 'path';
 import fs from 'fs';
 import { prisma } from '@/lib/db';
 import type { StrategySource, StrategyAction } from '@/lib/strategy-provider';
 import { TsPluginStrategyProvider } from '@/lib/strategy-ts-plugin';
 import { BacktestEngine } from '@/lib/backtest-engine';
-import { buildFeatures } from '@/lib/ml-utils';
+import { buildFeatures, buildFeaturesFromSpec } from '@/lib/ml-utils';
+import { buildMtfWindow } from '@/lib/mtf';
+import { computeSmcFlagsForSlice } from '@/lib/smc';
 import { registerArtifact, promote, prune } from '@/lib/model-registry';
 import { makeSupervisedMetrics } from '@/lib/metrics';
+
+// Helper: read MTF timeframes from Strategy.parameters.compiled.metadata.mtf.timeframes
+async function getMtfTimeframes(strategyId: string): Promise<string[] | undefined> {
+  try {
+    const s = await prisma.strategy.findUnique({ where: { id: strategyId }, select: { parameters: true } });
+    const p: any = s?.parameters || {};
+    const tfs: string[] | undefined = p?.compiled?.metadata?.mtf?.timeframes;
+    if (Array.isArray(tfs) && tfs.length) {
+      return Array.from(new Set(tfs.map((x) => String(x).trim().toLowerCase())));
+    }
+  } catch {}
+  return undefined;
+}
 
 export type SupervisedTrainOptions = {
   agentId: string;
@@ -42,6 +77,9 @@ export async function trainWalkForward(opts: SupervisedTrainOptions & {
   ratios?: { train: number; val: number; test: number };
   learningRate?: number;
 }) {
+  const mtfTimeframes = await getMtfTimeframes(opts.strategyId);
+  const indicators = await getStrategyIndicators(opts.strategyId);
+  const smcFeatures = await getSmcFeatures(opts.strategyId);
   const { X, y, featDim } = await buildRawDataset(
     opts.symbol,
     opts.timeframe,
@@ -50,6 +88,10 @@ export async function trainWalkForward(opts: SupervisedTrainOptions & {
     opts.limit ?? 5000,
     opts.labelingMode ?? 'future_return',
     opts.strategySource,
+    undefined,
+    mtfTimeframes,
+    indicators,
+    smcFeatures,
   );
   const N = X.length;
   const ratios = opts.ratios ?? { train: 0.7, val: 0.15, test: 0.15 };
@@ -206,13 +248,53 @@ async function buildRawDataset(
   limit = 5000,
   labelingMode: 'future_return' | 'imitation_strategy' = 'future_return',
   strategySource?: StrategySource,
+  _reserved?: any,
+  mtfTimeframes?: string[],
+  indicators?: string[],
+  smcFeatures?: string[],
 ) {
-  // pull recent MarketData joined with Indicator
+  // If MTF was specified in strategy, build windows from pure OHLCV across timeframes
+  if (mtfTimeframes && mtfTimeframes.length) {
+    const { baseTf, windows } = await buildMtfWindow({ symbol, timeframes: mtfTimeframes, lookback, limit, indicators: indicators || [], smcFeatures: smcFeatures || [] });
+    // Fetch base series to compute labels
+    const baseSeries = await prisma.marketData.findMany({ where: { symbol, timeframe: baseTf }, orderBy: { timestamp: 'asc' }, take: windows.length + lookahead + 2 });
+    const X: number[][][] = [];
+    const y: number[] = [];
+    const ts: Date[] = [];
+    for (let i = 0; i + lookahead < windows.length; i++) {
+      const feats = windows[i].feats;
+      let label = 0;
+      if (labelingMode === 'imitation_strategy' && strategySource) {
+        // fallback: future_return if not implemented
+        const futureClose = baseSeries[i + lookback - 1 + lookahead]?.close;
+        const currClose = baseSeries[i + lookback - 1]?.close;
+        if (Number.isFinite(futureClose) && Number.isFinite(currClose)) {
+          const ret = (futureClose - currClose) / currClose;
+          const thr = 0.002;
+          label = ret > thr ? 1 : ret < -thr ? 2 : 0;
+        }
+      } else {
+        const futureClose = baseSeries[i + lookback - 1 + lookahead]?.close;
+        const currClose = baseSeries[i + lookback - 1]?.close;
+        if (Number.isFinite(futureClose) && Number.isFinite(currClose)) {
+          const ret = (futureClose - currClose) / currClose;
+          const thr = 0.002;
+          label = ret > thr ? 1 : ret < -thr ? 2 : 0;
+        }
+      }
+      X.push(feats);
+      y.push(label);
+      ts.push(baseSeries[i + lookback - 1]?.timestamp as unknown as Date);
+    }
+    const featDim = X[0]?.[0]?.length || 0;
+    return { X, y, featDim, ts };
+  }
+
+  // Single-timeframe path: build OHLCV features and optionally append only requested indicators and SMC flags
   const md = await prisma.marketData.findMany({
     where: { symbol, timeframe },
     orderBy: { timestamp: 'asc' },
     take: limit + lookback + lookahead + 1,
-    include: { indicators: true },
   });
   if (md.length < lookback + lookahead + 10) {
     throw new Error('Not enough market data to build dataset');
@@ -236,6 +318,15 @@ async function buildRawDataset(
     }
   }
 
+  // Preload requested indicators for exact timestamps if any were specified by strategy
+  let indMap: Map<number, any> | undefined;
+  const fields = indicators && indicators.length ? indicators : [];
+  if (fields.length) {
+    const tsList = md.map(r => r.timestamp);
+    const inds = await prisma.indicator.findMany({ where: { symbol, timeframe, timestamp: { in: tsList } } });
+    indMap = new Map(inds.map(i => [i.timestamp.getTime(), i]));
+  }
+
   const endIdx = labelingMode === 'imitation_strategy' ? md.length : (md.length - lookahead);
   for (let i = lookback; i < endIdx; i++) {
     const windowRows = md.slice(i - lookback, i);
@@ -251,8 +342,12 @@ async function buildRawDataset(
       label = ret > thr ? 1 : ret < -thr ? 2 : 0;
     }
 
-    // Build features with basic fallbacks
-    const feats = windowRows.map((r) => buildFeatures({ ...r, ...(r as any).indicators?.[0] }));
+    // Build features strictly using OHLCV + requested indicators (if any)
+    const feats = windowRows.map((r) => {
+      if (!indMap || !fields.length) return buildFeaturesFromSpec(r, []);
+      const rowInd = indMap.get(r.timestamp.getTime());
+      return buildFeaturesFromSpec({ ...r, ...(rowInd || {}) }, fields);
+    });
     X.push(feats);
     y.push(label);
     ts.push(md[i].timestamp as unknown as Date);
@@ -293,8 +388,8 @@ function computeSplitIdx(N: number, trainRatio = 0.8, valRatio = 0.1) {
   return { trainEnd, valEnd };
 }
 
-export async function loadDatasetFromDB(symbol: string, timeframe: string, lookback: number, lookahead: number, limit = 5000, labelingMode: 'future_return' | 'imitation_strategy' = 'future_return', strategySource?: StrategySource, ratios?: { train: number; val: number; test: number }) {
-  const { X, y, featDim, ts } = await buildRawDataset(symbol, timeframe, lookback, lookahead, limit, labelingMode, strategySource);
+export async function loadDatasetFromDB(symbol: string, timeframe: string, lookback: number, lookahead: number, limit = 5000, labelingMode: 'future_return' | 'imitation_strategy' = 'future_return', strategySource?: StrategySource, ratios?: { train: number; val: number; test: number }, mtfTimeframes?: string[], indicators?: string[], smcFeatures?: string[]) {
+  const { X, y, featDim, ts } = await buildRawDataset(symbol, timeframe, lookback, lookahead, limit, labelingMode, strategySource, undefined, mtfTimeframes, indicators, smcFeatures);
 
   // Chronological split: train 80%, val 10%, test 10%
   const N = X.length;
@@ -376,6 +471,9 @@ function selectSupervisedArchitecture(agentAlgorithm: string | null | undefined)
 export async function trainSupervised(opts: SupervisedTrainOptions & { learningRate?: number }): Promise<SupervisedTrainResult> {
   const epochs = opts.epochs ?? 8;
   const batchSize = opts.batchSize ?? 64;
+  const mtfTimeframes = await getMtfTimeframes(opts.strategyId);
+  const indicators = await getStrategyIndicators(opts.strategyId);
+  const smcFeatures = await getSmcFeatures(opts.strategyId);
   const { train, val, test, featDim, scaler, timestamps } = await loadDatasetFromDB(
     opts.symbol,
     opts.timeframe,
@@ -385,6 +483,9 @@ export async function trainSupervised(opts: SupervisedTrainOptions & { learningR
     opts.labelingMode ?? 'future_return',
     opts.strategySource,
     opts.ratios,
+    mtfTimeframes,
+    indicators,
+    smcFeatures,
   );
   // Fetch agent to choose architecture by Agent.algorithm
   const agent = await prisma.agent.findUnique({ where: { id: opts.agentId }, select: { algorithm: true } });

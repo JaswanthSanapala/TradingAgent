@@ -3,6 +3,8 @@ import { prisma } from '@/lib/db';
 import { writeFile, mkdir } from 'fs/promises';
 import path from 'path';
 import { compileStrategy } from '@/lib/strategy-compiler';
+import { validateSystemMarkdown } from '@/lib/strategy-loader';
+import { promises as fs } from 'fs';
 
 export const dynamic = 'force-dynamic';
 
@@ -25,105 +27,11 @@ export async function GET() {
 }
 
 export async function POST(request: NextRequest) {
-  try {
-    const formData = await request.formData();
-    const name = formData.get('name') as string;
-    const description = formData.get('description') as string;
-    const file = formData.get('file') as File | null;
-    const editedContent = formData.get('fileContent') as string | null;
-    
-    if (!name) {
-      return NextResponse.json(
-        { success: false, error: 'Name is required' },
-        { status: 400 }
-      );
-    }
-
-    let fileName: string | null = null;
-    let fileContent: string | null = null;
-
-    if (file) {
-      const bytes = await file.arrayBuffer();
-      const buffer = Buffer.from(bytes);
-      
-      // Create uploads directory if it doesn't exist
-      const uploadsDir = path.join(process.cwd(), 'uploads', 'strategies');
-      await mkdir(uploadsDir, { recursive: true });
-      
-      // Generate unique filename
-      const timestamp = Date.now();
-      fileName = `${timestamp}_${file.name}`;
-      const filePath = path.join(uploadsDir, fileName);
-      
-      await writeFile(filePath, buffer);
-      fileContent = buffer.toString('utf-8');
-    }
-
-    // If user provided edited content in the form, prefer that
-    if (editedContent && editedContent.trim().length > 0) {
-      fileContent = editedContent;
-    }
-
-    // Create default user if none exists (since no auth)
-    let user = await prisma.user.findFirst();
-    if (!user) {
-      user = await prisma.user.create({
-        data: {
-          email: 'default@trading.ai',
-          name: 'Default User',
-        },
-      });
-    }
-
-    // Compile strategy into IR for the agent to understand
-    const { ir, notes } = compileStrategy({ name, description, fileName, fileContent });
-
-    const data: any = {
-      name,
-      userId: user.id,
-      parameters: {
-        fileName: fileName,
-        fileContent: fileContent,
-        fileType: (file as any)?.type || null,
-        compiled: ir,
-        compilerNotes: notes,
-      },
-    };
-
-    if (description) {
-      data.description = description;
-    }
-
-    const strategy = await prisma.strategy.create({ data });
-
-    // Auto-create an Agent for this strategy that "understands" the compiled IR
-    // Use a sensible default algorithm and embed the compiled IR + origin reference
-    const agentName = `${name} Agent`;
-    const createdAgent = await prisma.agent.create({
-      data: {
-        name: agentName,
-        algorithm: 'ppo',
-        version: 1,
-        parameters: {
-          lr: 3e-4,
-          gamma: 0.99,
-          strategyIR: (data.parameters as any)?.compiled,
-          strategyOrigin: (data.parameters as any)?.compiled?.origin,
-        },
-        performance: { progress: 0, status: 'pending' },
-        strategyId: strategy.id,
-        userId: user.id,
-      },
-    });
-
-    return NextResponse.json({ success: true, strategy, agent: createdAgent });
-  } catch (error) {
-    console.error('Error creating strategy:', error);
-    return NextResponse.json(
-      { success: false, error: 'Failed to create strategy' },
-      { status: 500 }
-    );
-  }
+  // Deprecated in favor of /api/strategies/upload (system-format markdown only)
+  return new NextResponse(
+    JSON.stringify({ success: false, error: 'Removed. Use POST /api/strategies/upload (system-format markdown only).' }),
+    { status: 410, headers: { 'Content-Type': 'application/json' } }
+  );
 }
 
 export async function PUT(request: NextRequest) {
@@ -158,7 +66,8 @@ export async function PUT(request: NextRequest) {
       const filePath = path.join(uploadsDir, newName);
       await writeFile(filePath, buffer);
       parameters.fileName = newName;
-      parameters.fileType = (file as any).type || null;
+      const ext = path.extname(file.name).toLowerCase();
+      parameters.fileType = (file as any).type || (ext ? `text/${ext.slice(1)}` : null);
       parameters.fileContent = buffer.toString('utf-8');
     }
 
@@ -170,6 +79,13 @@ export async function PUT(request: NextRequest) {
     // Re-compile with latest name/description and content
     const finalName = name ?? existing.name;
     const finalDesc = description ?? existing.description ?? undefined;
+    // Enforce system-format markdown only
+    if (parameters.fileContent) {
+      const valid = validateSystemMarkdown(parameters.fileContent as string);
+      if (!valid.ok) {
+        return NextResponse.json({ success: false, error: 'Invalid system markdown', details: valid.errors }, { status: 400 });
+      }
+    }
     const { ir, notes } = compileStrategy({
       name: finalName,
       description: finalDesc,
@@ -204,6 +120,20 @@ export async function DELETE(request: NextRequest) {
     const id = body?.id;
     if (!id) {
       return NextResponse.json({ success: false, error: 'id is required' }, { status: 400 });
+    }
+
+    // Find strategy to get uploaded file info
+    const existing = await prisma.strategy.findUnique({ where: { id } });
+    if (existing) {
+      const params: any = existing.parameters || {};
+      const fileName: string | undefined = params.fileName;
+      if (fileName) {
+        const uploadsDir = path.join(process.cwd(), 'uploads', 'strategies');
+        const filePath = path.join(uploadsDir, fileName);
+        try {
+          await fs.unlink(filePath);
+        } catch {}
+      }
     }
 
     await prisma.strategy.delete({ where: { id } });

@@ -25,7 +25,6 @@ Note: Live trading, real broker connections, and production-grade ML are not ena
 - Prisma ORM (SQLite)
 - Socket.IO (server + client)
 - Nodemon + tsx custom server
-- TanStack Query, Zustand, React Hook Form, Zod
 
 ---
 
@@ -35,15 +34,13 @@ Note: Live trading, real broker connections, and production-grade ML are not ena
 .
 ├─ prisma/
 │  └─ schema.prisma            # Database schema (SQLite)
-├─ db/
-│  └─ custom.db                # SQLite DB file (created after push/migrate)
 ├─ public/                     # Static assets
 ├─ src/
 │  ├─ app/                     # Next.js App Router
 │  ├─ components/              # UI components (incl. shadcn/ui wrappers)
 │  ├─ hooks/                   # Custom hooks
-│  └─ lib/                     # Core domain logic
-├─ uploads/                    # User-uploaded strategy artifacts
+│  ├─ lib/                     # Core domain logic
+│  └─ workers/                 # Background workers
 ├─ server.ts                   # Custom Next.js + Socket.IO server
 ├─ next.config.ts              # Next.js configuration
 ├─ package.json                # Scripts and dependencies
@@ -58,31 +55,34 @@ Note: Live trading, real broker connections, and production-grade ML are not ena
 
 Create a `.env` file in the project root. Required by `src/lib/config.ts`:
 
-- SYMBOLS: comma-separated trading symbols (e.g., `BTC/USDT,ETH/USDT`)
-- TIMEFRAMES: comma-separated timeframes (e.g., `1h,4h,1d`)
-
-Optional:
-
-- DATABASE_URL (SQLite). Example: `file:./db/custom.db`
-- HOSTNAME (default: `0.0.0.0`)
-- PORT (default: `3000`)
-- SCHEDULER_ENABLED (default: `true`)
-- SCHEDULER_TICK_MS (default: `15000`)
-- NEXT_PUBLIC_SITE_URL
-- NEXT_PUBLIC_SOCKET_PATH (default: `/api/socketio`)
-- NEWS_FEEDS
-- EXCHANGE_ID, EXCHANGE_API_KEY, EXCHANGE_SECRET, EXCHANGE_SANDBOX
-
-Example `.env`:
-
-```env
-DATABASE_URL="file:./db/custom.db"
-SYMBOLS="BTC/USDT,ETH/USDT"
-TIMEFRAMES="1h,4h,1d"
-HOSTNAME="0.0.0.0"
-PORT="3000"
-SCHEDULER_ENABLED="true"
-NEXT_PUBLIC_SOCKET_PATH="/api/socketio"
+Example .env:
+```dotenv
+NODE_ENV=
+HOSTNAME=
+PORT=
+SCHEDULER_ENABLED=
+SCHEDULER_TICK_MS=
+REDIS_ENABLED=
+REDIS_URL=
+SUPERVISED_WORKER_ENABLED=
+SUPERVISED_WORKER_ENABLED=
+NEXT_PUBLIC_SITE_URL=
+NEXT_PUBLIC_SOCKET_PATH=
+NEWS_FEEDS=
+DATABASE_URL=
+EXCHANGE_ID=
+EXCHANGE_API_KEY=
+EXCHANGE_SECRET=
+EXCHANGE_SANDBOX=
+EXECUTION_ENABLED=
+RISK_PER_TRADE_PCT=
+QUOTE_CURRENCY=
+ORDER_POLL_MS=
+PREDICTION_MIN_CONF=
+PREDICTION_COOLDOWN_SEC=
+DO_NOT_TRADE=
+SYMBOLS=
+TIMEFRAMES=
 ```
 
 ---
@@ -164,15 +164,6 @@ npm run lint
 
 ---
 
-## Roadmap (Not Included by Default)
-
-- Live trading execution and broker integrations
-- Persistent ML training/inference
-- Live market data streaming providers
-- Full authentication flows wired to UI
-
----
-
 ## Troubleshooting
 
 - If `SYMBOLS` or `TIMEFRAMES` are missing, the server will throw on startup. Define them in `.env`.
@@ -181,7 +172,3 @@ npm run lint
 - `.gitignore` excludes `.env*`, `.next/`, `node_modules/`, `/data`, logs, etc. After cloning, follow Setup to recreate what's needed.
 
 ---
-
-## License
-
-MIT (or your preferred license).

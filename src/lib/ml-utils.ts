@@ -32,6 +32,24 @@ export function buildFeatures(row: any) {
   ];
 }
 
+// Build features strictly based on requested fields: OHLCV + indicators in the given order.
+// This ensures we only use indicators explicitly specified by the strategy.
+export function buildFeaturesFromSpec(row: any, fields: string[]): number[] {
+  const base = [
+    Number(row.open) || 0,
+    Number(row.high) || 0,
+    Number(row.low) || 0,
+    Number(row.close) || 0,
+    Number(row.volume) || 0,
+  ];
+  if (!fields || fields.length === 0) return base;
+  const ext = fields.map((f) => {
+    const v = (row as any)[f];
+    return typeof v === 'number' && Number.isFinite(v) ? v : 0;
+  });
+  return base.concat(ext);
+}
+
 export async function predictAction(modelPath: string, window: number[][]) {
   const model = await tf.loadLayersModel(`file://${modelPath}/model.json`);
   // Load scaler

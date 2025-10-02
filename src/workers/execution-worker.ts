@@ -72,7 +72,7 @@ export function startExecutionWorker() {
                 status: 'open',
               } as any,
             });
-            try { socketBus.emit('trade:updated', { type: 'opened', symbol, entryPrice: price, size: Number(res.amount ?? data.amount ?? 0), ts: new Date().toISOString() }); } catch {}
+            try { socketBus.emit('trade:updated', { type: 'opened', symbol, entryPrice: price, size: Number(res.amount ?? data.amount ?? 0), stopLoss: Number(data.stopLoss ?? 0) || null, takeProfit: Number(data.takeProfit ?? 0) || null, ts: new Date().toISOString() }); } catch {}
 
             // Attempt OCO placement for TP/SL on BUY fills (Binance spot best-effort)
             try {

@@ -1,5 +1,3 @@
-// Centralized config loader
-
 function envOrThrow(key: string): string {
   const v = process.env[key];
   if (!v) throw new Error(`Missing required environment variable: ${key}`);
@@ -12,8 +10,13 @@ export const CONFIG = {
   PORT: Number(process.env.PORT),
   SCHEDULER_ENABLED: (process.env.SCHEDULER_ENABLED ?? "true").toLowerCase() !== "false",
   SCHEDULER_TICK_MS: Number(process.env.SCHEDULER_TICK_MS),
+  
+  // Redis / Queueing
+  REDIS_ENABLED: (process.env.REDIS_ENABLED ?? 'false').toLowerCase() === 'true',
+  REDIS_URL: process.env.REDIS_URL,
   // Workers
   SUPERVISED_WORKER_ENABLED: (process.env.SUPERVISED_WORKER_ENABLED ?? 'false').toLowerCase() === 'true',
+  MARKET_STREAMER_ENABLED: (process.env.MARKET_STREAMER_ENABLED ?? 'false').toLowerCase() === 'true',
 
   // Client/site
   NEXT_PUBLIC_SITE_URL: process.env.NEXT_PUBLIC_SITE_URL, 
@@ -40,8 +43,9 @@ export const CONFIG = {
   DO_NOT_TRADE: (process.env.DO_NOT_TRADE || '').split(',').map(s => s.trim()).filter(Boolean),
 
   // Symbols and timeframes
-  SYMBOLS: envOrThrow('SYMBOLS').split(',').map(s => s.trim()).filter(Boolean),
-  TIMEFRAMES: envOrThrow('TIMEFRAMES').split(',')
+  SYMBOLS: (process.env.SYMBOLS || '').split(',').map(s => s.trim()).filter(Boolean),
+  TIMEFRAMES: (process.env.TIMEFRAMES || '')
+    .split(',')
     .map(s => s.trim())
     .filter(Boolean)
     .reduce<Record<string,string>>((acc, tf) => { acc[tf] = tf; return acc; }, {}),

@@ -1,14 +1,18 @@
 import { Queue, Worker, QueueEvents, JobsOptions, ConnectionOptions } from 'bullmq';
 import IORedis from 'ioredis';
+import { CONFIG } from '@/lib/config';
 
 // Centralized BullMQ connection and queues
-// REDIS_URL example: redis://localhost:6379
-const REDIS_URL = process.env.REDIS_URL || 'redis://127.0.0.1:6379';
+const REDIS_URL = CONFIG.REDIS_URL || process.env.REDIS_URL || 'redis://127.0.0.1:6379';
 
-export const connection = new IORedis(REDIS_URL, {
-  maxRetriesPerRequest: null,
-  enableReadyCheck: true,
-});
+// Lazy connection to avoid immediate connection attempts when Redis is disabled or down
+export const connection = CONFIG.REDIS_ENABLED
+  ? new IORedis(REDIS_URL, {
+      lazyConnect: true,
+      maxRetriesPerRequest: null,
+      enableReadyCheck: true,
+    })
+  : (null as unknown as IORedis);
 
 export type QueueNames =
   | 'train_supervised'
@@ -22,6 +26,18 @@ export type QueueNames =
   | 'coverage_tick';
 
 function makeQueue<T = any>(name: QueueNames) {
+  if (!CONFIG.REDIS_ENABLED) {
+    // Return a minimal stub that throws on usage, to make failures explicit without connecting
+    const stub: any = {
+      add: async () => {
+        throw new Error('Redis is disabled. Set REDIS_ENABLED=true and configure REDIS_URL to use queues.');
+      },
+      addBulk: async () => {
+        throw new Error('Redis is disabled.');
+      },
+    };
+    return stub as Queue<T>;
+  }
   return new Queue<T>(name, { connection: connection as unknown as ConnectionOptions });
 }
 
@@ -38,6 +54,10 @@ export const queues = {
 };
 
 export function createQueueEvents(name: QueueNames) {
+  if (!CONFIG.REDIS_ENABLED) {
+    // Create a stub that throws upon usage
+    throw new Error('Redis is disabled. Enable it to use QueueEvents.');
+  }
   return new QueueEvents(name, { connection: connection as unknown as ConnectionOptions });
 }
 

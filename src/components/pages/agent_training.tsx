@@ -74,24 +74,31 @@ export default function AgentTrainingPage() {
   const [dsForm, setDsForm] = useState({
     symbol: 'BTC_USDT',
     timeframe: '1h',
-    exchangeId: 'binance',
     startDate: '2020-01-01T00:00:00Z',
     endDate: new Date().toISOString(),
   });
   const [dsResolving, setDsResolving] = useState(false);
   const [dsSuggestions, setDsSuggestions] = useState<Array<{ unified: string; storageSymbol: string; score: number }>>([]);
+  // Backtest state per agent
+  const [btLoading, setBtLoading] = useState<Record<string, boolean>>({});
+  const [btSummary, setBtSummary] = useState<Record<string, { totalTrades: number; winRate: number; totalPnl: number; totalPnlPercent: number; maxDrawdownPercent: number; sharpeRatio: number; profitFactor: number }>>({});
 
   const fetchData = async () => {
     try {
       const res = await fetch("/api/agents");
       const data = await res.json();
       if (data.success) {
-        setAgents(data.agents || []);
-        // Build strategy options from the agents list (agent is auto-created per strategy)
+        setAgents((data.agents || []) as Agent[]);
+        // Build strategy options from agents' strategies plus untrainedStrategies
         const uniq: Record<string, Strategy> = {};
         (data.agents || []).forEach((a: any) => {
           if (!uniq[a.strategyId]) {
             uniq[a.strategyId] = { id: a.strategyId, name: a.strategy?.name || a.strategyId };
+          }
+        });
+        (data.untrainedStrategies || []).forEach((s: any) => {
+          if (!uniq[s.id]) {
+            uniq[s.id] = { id: s.id, name: s.name };
           }
         });
         setStrategyOptions(Object.values(uniq));
@@ -99,8 +106,49 @@ export default function AgentTrainingPage() {
         toast.error(data.error || "Failed to fetch agents");
       }
     } catch (e) {
-      console.error(e);
       toast.error("Failed to fetch agents");
+    }
+  };
+
+  const runBacktest = async (agent: Agent) => {
+    try {
+      setBtLoading(prev => ({ ...prev, [agent.id]: true }));
+      const payload = {
+        config: {
+          symbol: dsForm.symbol || 'BTC_USDT',
+          timeframe: dsForm.timeframe || '1h',
+          initialBalance: 10000,
+          maxRiskPerTrade: 0.01,
+          maxTradesPerDay: 10,
+          minRewardRiskRatio: 1.5,
+        },
+      };
+      const res = await fetch(`/api/agents/${agent.id}/backtest`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
+      const json = await res.json();
+      if (!json?.success) throw new Error(json?.error || 'Backtest failed');
+      const result = json.data || {};
+      const summary = {
+        totalTrades: Number(result.totalTrades || 0),
+        winRate: Number(((result.winRate || 0) * 100).toFixed(2)),
+        totalPnl: Number((result.totalPnl || 0).toFixed(2)),
+        totalPnlPercent: Number((result.totalPnlPercent || 0).toFixed(2)),
+        maxDrawdownPercent: Number((result.maxDrawdownPercent || 0).toFixed(2)),
+        sharpeRatio: Number((result.sharpeRatio || 0).toFixed(2)),
+        profitFactor: Number(
+          result.profitFactor === Infinity
+            ? 999
+            : Number(result.profitFactor || 0).toFixed
+            ? Number(Number(result.profitFactor || 0).toFixed(2))
+            : 0
+        ),
+      } as any;
+      setBtSummary(prev => ({ ...prev, [agent.id]: summary }));
+      toast.success('Backtest completed');
+    } catch (e: any) {
+      console.error(e);
+      toast.error(e?.message || 'Backtest failed');
+    } finally {
+      setBtLoading(prev => ({ ...prev, [agent.id]: false }));
     }
   };
 
@@ -118,16 +166,16 @@ export default function AgentTrainingPage() {
     }
   };
 
-  const resolveSymbol = async (raw: string, ex: string) => {
+  const resolveSymbol = async (raw: string) => {
     if (!raw) return null;
     try {
       setDsResolving(true);
-      const url = `/api/symbols/resolve?symbol=${encodeURIComponent(raw)}&exchangeId=${encodeURIComponent(ex || 'binance')}`;
+      const url = `/api/symbols/resolve?symbol=${encodeURIComponent(raw)}`;
       const res = await fetch(url);
       const json = await res.json();
-      if (json.ok && json.matched && json.storageSymbol) {
+      if (json.ok && json.matched && (json.result?.storageSymbol || json.storageSymbol)) {
         setDsSuggestions([]);
-        return json.storageSymbol as string;
+        return (json.result?.storageSymbol || json.storageSymbol) as string;
       }
       if (json.ok && !json.matched && Array.isArray(json.suggestions)) {
         setDsSuggestions(json.suggestions);
@@ -357,9 +405,9 @@ export default function AgentTrainingPage() {
                           value={dsForm.symbol}
                           onChange={e => setDsForm({ ...dsForm, symbol: e.target.value })}
                           onBlur={async () => {
-                            const corrected = await resolveSymbol(dsForm.symbol, dsForm.exchangeId);
+                            const corrected = await resolveSymbol(dsForm.symbol);
                             if (corrected) {
-                              // auto-correct and display corrected storage symbol (BTC_USDT)
+                              // auto-correct and display corrected storage symbol
                               setDsForm(f => ({ ...f, symbol: corrected }));
                               toast.success(`Symbol corrected to ${corrected}`);
                             } else if (dsForm.symbol) {
@@ -394,10 +442,6 @@ export default function AgentTrainingPage() {
                         <Input value={dsForm.timeframe} onChange={e => setDsForm({ ...dsForm, timeframe: e.target.value })} />
                       </div>
                       <div>
-                        <Label>Exchange</Label>
-                        <Input value={dsForm.exchangeId} onChange={e => setDsForm({ ...dsForm, exchangeId: e.target.value })} />
-                      </div>
-                      <div>
                         <Label>Start</Label>
                         <Input value={dsForm.startDate} onChange={e => setDsForm({ ...dsForm, startDate: e.target.value })} />
                       </div>
@@ -409,7 +453,7 @@ export default function AgentTrainingPage() {
                     <div className="flex justify-end">
                       <Button size="sm" onClick={async () => {
                         // ensure symbol is corrected before create
-                        const corrected = await resolveSymbol(dsForm.symbol, dsForm.exchangeId);
+                        const corrected = await resolveSymbol(dsForm.symbol);
                         const payload = { ...dsForm, symbol: corrected || dsForm.symbol };
                         try {
                           const res = await fetch('/api/datasets', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
@@ -490,7 +534,7 @@ export default function AgentTrainingPage() {
               </div>
             ) : (
               <div className="grid gap-4">
-                {agents.map(agent => {
+                {agents.filter(a => (a.performance?.status ?? '') !== 'untrained').map(agent => {
                   const status = agent.performance?.status || 'pending';
                   const canPause = status === 'training';
                   const canResume = status === 'paused';
@@ -518,7 +562,20 @@ export default function AgentTrainingPage() {
                         <Button size="sm" variant="destructive" onClick={() => deleteAgent(agent.id)}>
                           <Trash2 className="h-4 w-4 mr-1"/>Delete
                         </Button>
+                        <Button size="sm" onClick={() => runBacktest(agent)} disabled={btLoading[agent.id] === true}>
+                          {btLoading[agent.id] ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Play className="h-4 w-4 mr-2" />}Backtest current model
+                        </Button>
                       </div>
+                      {btSummary[agent.id] && (
+                        <div className="mt-3 grid grid-cols-2 md:grid-cols-4 gap-3 text-xs">
+                          <div className="border rounded p-2"><div className="text-muted-foreground">Trades</div><div className="font-medium">{btSummary[agent.id].totalTrades}</div></div>
+                          <div className="border rounded p-2"><div className="text-muted-foreground">WinRate</div><div className="font-medium">{btSummary[agent.id].winRate}%</div></div>
+                          <div className="border rounded p-2"><div className="text-muted-foreground">PnL</div><div className="font-medium">{btSummary[agent.id].totalPnl} ({btSummary[agent.id].totalPnlPercent}%)</div></div>
+                          <div className="border rounded p-2"><div className="text-muted-foreground">MDD%</div><div className="font-medium">{btSummary[agent.id].maxDrawdownPercent}%</div></div>
+                          <div className="border rounded p-2"><div className="text-muted-foreground">Sharpe</div><div className="font-medium">{btSummary[agent.id].sharpeRatio}</div></div>
+                          <div className="border rounded p-2"><div className="text-muted-foreground">PF</div><div className="font-medium">{btSummary[agent.id].profitFactor}</div></div>
+                        </div>
+                      )}
                       {latest && (
                         <div className="mt-3 text-xs text-muted-foreground">
                           Latest: Episode {latest.episode} • Reward {latest.totalReward.toFixed(2)} • WinRate {(latest.winRate*100).toFixed(1)}% • Sharpe {latest.sharpeRatio.toFixed(2)}

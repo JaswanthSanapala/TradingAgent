@@ -84,8 +84,7 @@ export default function StrategiesPage() {
         formDataToSend.append('id', editingStrategy.id);
       }
 
-      const url = '/api/strategies';
-      
+      const url = editingStrategy ? '/api/strategies' : '/api/strategies/upload';
       const method = editingStrategy ? 'PUT' : 'POST';
 
       const response = await fetch(url, {
@@ -151,7 +150,7 @@ export default function StrategiesPage() {
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
-      const allowedTypes = ['.js'];
+      const allowedTypes = ['.md'];
       const fileExtension = '.' + file.name.split('.').pop()?.toLowerCase();
 
       if (allowedTypes.includes(fileExtension)) {
@@ -164,7 +163,7 @@ export default function StrategiesPage() {
         };
         reader.readAsText(file);
       } else {
-        toast.error('Please upload a .js strategy file');
+        toast.error('Please upload a system-format .md strategy file');
         e.target.value = '';
       }
     }
@@ -252,7 +251,7 @@ export default function StrategiesPage() {
                       <Input
                         id="file"
                         type="file"
-                        accept=".js"
+                        accept=".md"
                         onChange={handleFileChange}
                         className="cursor-pointer hidden"
                         ref={fileInputRef}
@@ -269,7 +268,7 @@ export default function StrategiesPage() {
                         </>
                       )}
                       <p className="text-xs text-muted-foreground basis-full">
-                        Upload .js strategy files only (module must export computeActions(ctx))
+                        Upload a strategy as system-format Markdown (.md). You can write plain rules and sections (Overview, Timeframes, Risk Management, Indicators). We’ll parse and normalize it automatically—no code required.
                       </p>
                     </div>
                   </div>

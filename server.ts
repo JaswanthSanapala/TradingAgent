@@ -67,33 +67,53 @@ async function createCustomServer() {
       } else {
         console.log('> Coverage scheduler: DISABLED via SCHEDULER_ENABLED=false');
       }
-      // Start BullMQ supervised training worker
-      startSupervisedWorker();
-      console.log('> Workers: supervised training worker started');
-      // Start RL worker
-      startRLWorker();
-      console.log('> Workers: RL worker started');
-      // Start data workers
-      startDataBackfillWorker();
-      startDataExportWorker();
-      startDataWindowsWorker();
-      console.log('> Workers: data workers started (backfill/export/windows)');
-      // Start execution worker
-      startExecutionWorker();
-      console.log('> Workers: broker execution worker started');
-      // Start order poller
-      startOrderPoller();
-      console.log('> Workers: order poller started');
-      // Start market streamer
-      startMarketStreamer();
-      console.log('> Workers: market streamer started');
-      // Start TP/SL watcher
-      startTpSlWatcher();
-      console.log('> Workers: TP/SL watcher started');
-      // Start coverage worker and schedule repeatable tick
-      startCoverageWorker();
-      scheduleCoverageTick();
-      console.log('> Workers: coverage worker started with repeatable tick');
+
+      // Start market streamer only if explicitly enabled and symbols configured
+      if (CONFIG.MARKET_STREAMER_ENABLED && (CONFIG.SYMBOLS && CONFIG.SYMBOLS.length > 0)) {
+        try {
+          startMarketStreamer();
+          console.log('> Workers: market streamer started');
+        } catch (e) {
+          console.log('> Workers: market streamer failed to start', e);
+        }
+      } else {
+        console.log('> Workers: market streamer DISABLED (set MARKET_STREAMER_ENABLED=true and provide SYMBOLS to enable)');
+      }
+
+      // Start Redis-dependent workers only if REDIS_ENABLED
+      if (CONFIG.REDIS_ENABLED) {
+        // Start BullMQ supervised training worker
+        if (CONFIG.SUPERVISED_WORKER_ENABLED) {
+          startSupervisedWorker();
+          console.log('> Workers: supervised training worker started');
+        } else {
+          console.log('> Workers: supervised training worker DISABLED');
+        }
+
+        // Start RL worker
+        startRLWorker();
+        console.log('> Workers: RL worker started');
+        // Start data workers
+        startDataBackfillWorker();
+        startDataExportWorker();
+        startDataWindowsWorker();
+        console.log('> Workers: data workers started (backfill/export/windows)');
+        // Start execution worker
+        startExecutionWorker();
+        console.log('> Workers: broker execution worker started');
+        // Start order poller
+        startOrderPoller();
+        console.log('> Workers: order poller started');
+        // Start TP/SL watcher
+        startTpSlWatcher();
+        console.log('> Workers: TP/SL watcher started');
+        // Start coverage worker and schedule repeatable tick
+        startCoverageWorker();
+        scheduleCoverageTick();
+        console.log('> Workers: coverage worker started with repeatable tick');
+      } else {
+        console.log('> Redis-dependent workers are DISABLED (set REDIS_ENABLED=true to enable)');
+      }
     });
 
   } catch (err) {

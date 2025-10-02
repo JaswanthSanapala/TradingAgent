@@ -1,12 +1,20 @@
 import { CONFIG } from '@/lib/config';
 import { createLogger } from '@/lib/logger';
-import { getTickerPrice } from '@/lib/broker';
+import { getTickerPrice, fetchOHLCV } from '@/lib/broker';
 import { socketBus } from '@/lib/socket-bus';
+import { prisma } from '@/lib/db';
+import { predictForAgent } from '@/lib/predictor';
 
 const log = createLogger('MarketStreamer');
 
 let started = false;
 let timer: NodeJS.Timeout | null = null;
+const lastTs: Record<string, number> = {}; // key: `${symbol}|${tf}` stores ms timestamp of last candle predicted
+
+function toDbSymbol(ccxtSymbol: string): string {
+  // 'BTC/USDT' -> 'BTC_USDT'
+  return ccxtSymbol.replace('/', '_');
+}
 
 export function startMarketStreamer() {
   if (started) return;
@@ -25,6 +33,45 @@ export function startMarketStreamer() {
       } catch (e: any) {
         log.error('Failed to fetch ticker', { symbol, error: e?.message });
       }
+      // For each configured timeframe, emit the latest OHLCV candle as well
+      try {
+        const tfs = Object.keys(CONFIG.TIMEFRAMES || {});
+        for (const tf of tfs) {
+          try {
+            const candles = await fetchOHLCV(symbol, tf, 2);
+            const last = candles[candles.length - 1];
+            if (last && last.length >= 6) {
+              const [t, o, h, l, c, v] = last;
+              socketBus.emit('market:ohlcv', { symbol, timeframe: tf, t, o, h, l, c, v });
+
+              // Trigger live prediction once per new candle per symbol/tf
+              const key = `${symbol}|${tf}`;
+              const prev = lastTs[key];
+              if (!prev || prev < t) {
+                lastTs[key] = t;
+                // Fire and forget predictions for all agents that have a model
+                queueMicrotask(async () => {
+                  try {
+                    const agents = await prisma.agent.findMany({ where: { modelPath: { not: null } }, select: { id: true, name: true, strategyId: true } });
+                    const dbSymbol = toDbSymbol(symbol);
+                    await Promise.allSettled(agents.map(a => predictForAgent({
+                      agentId: a.id,
+                      strategyId: a.strategyId,
+                      symbol: dbSymbol,
+                      timeframe: tf,
+                      lookback: 128,
+                    })));
+                  } catch (err: any) {
+                    log.error('Prediction dispatch failed', { symbol, timeframe: tf, error: err?.message });
+                  }
+                });
+              }
+            }
+          } catch (err: any) {
+            log.error('Failed to fetch OHLCV', { symbol, timeframe: tf, error: err?.message });
+          }
+        }
+      } catch {}
     }
   };
   // Emit once on start, then at interval

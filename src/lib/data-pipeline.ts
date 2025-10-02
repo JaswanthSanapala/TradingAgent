@@ -95,8 +95,148 @@ export class DataPipeline {
     }
   }
 
+  // --- Yahoo Finance helpers ---
+  private isYahooStorageSymbol(symbol: string): boolean {
+    return typeof symbol === 'string' && symbol.toUpperCase().startsWith('YF_');
+  }
+
+  // Convert storage symbol e.g. 'YF__NSEI' -> '^NSEI', 'YF_RELIANCE_NS' -> 'RELIANCE.NS'
+  private storageToYahooTicker(storageSymbol: string): string {
+    let s = storageSymbol.trim();
+    if (s.toUpperCase().startsWith('YF_')) s = s.slice(3);
+    // Leading underscore denotes caret that was sanitized (e.g., ^NSEI)
+    if (s.startsWith('_')) s = '^' + s.slice(1);
+    // Remaining underscores likely represent dots or dashes; prefer dot for Yahoo local listings
+    // This is heuristic; adjust if needed per market
+    s = s.replace(/_/g, '.');
+
+    // Normalize common index tickers to include caret even if user passed YF_NSEI (without double underscore)
+    const KNOWN_INDEX_TICKERS = new Set(['NSEI', 'NSEBANK', 'BSESN', 'GSPC', 'DJI', 'IXIC']);
+    const plain = s.replace(/^\^/, '');
+    if (KNOWN_INDEX_TICKERS.has(plain)) {
+      s = '^' + plain;
+    }
+    return s;
+  }
+
+  private mapTimeframeToYahooInterval(tf: string): string {
+    const t = tf.toLowerCase();
+    if (t === '1m') return '1m';
+    if (t === '5m') return '5m';
+    if (t === '15m') return '15m';
+    if (t === '30m') return '30m';
+    if (t === '1h') return '60m';
+    if (t === '2h') return '60m'; // Yahoo lacks 2h; caller will chunk appropriately
+    if (t === '4h') return '60m';
+    if (t === '1d') return '1d';
+    if (t === '1w' || t === '1wk') return '1wk';
+    return '1d';
+  }
+
+  // Detect if a Yahoo ticker is an index (which typically doesn't support intraday)
+  private isYahooIndexTicker(ticker: string): boolean {
+    if (!ticker) return false;
+    if (ticker.startsWith('^')) return true;
+    const KNOWN_INDEX_TICKERS = new Set(['NSEI', 'NSEBANK', 'BSESN', 'GSPC', 'DJI', 'IXIC']);
+    return KNOWN_INDEX_TICKERS.has(ticker.toUpperCase());
+  }
+
+  private async fetchYahooRange(params: { ticker: string; interval: string; startMs: number; endMs: number }): Promise<OHLCV[]> {
+    const { ticker, interval, startMs, endMs } = params;
+    const period1 = Math.floor(startMs / 1000);
+    const period2 = Math.floor(endMs / 1000);
+
+    const doFetch = async (t: string, intv: string) => {
+      const url = `https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(t)}?interval=${encodeURIComponent(intv)}&period1=${period1}&period2=${period2}`;
+      const res = await fetch(url, { headers: { 'Accept': 'application/json' } });
+      return res;
+    };
+
+    const parse = async (res: Response) => {
+      const json: any = await res.json();
+      const r = json?.chart?.result?.[0];
+      if (!r || !Array.isArray(r.timestamp) || !r.indicators?.quote?.[0]) return [];
+      const ts: number[] = r.timestamp.map((t: number) => t * 1000);
+      const q = r.indicators.quote[0];
+      const o: number[] = q.open || [];
+      const h: number[] = q.high || [];
+      const l: number[] = q.low || [];
+      const c: number[] = q.close || [];
+      const v: number[] = q.volume || [];
+      const out: OHLCV[] = [];
+      for (let i = 0; i < ts.length; i++) {
+        const open = Number(o[i]);
+        const high = Number(h[i]);
+        const low = Number(l[i]);
+        const close = Number(c[i]);
+        const vol = Number(v[i]);
+        if ([open, high, low, close].every(Number.isFinite)) {
+          out.push([ts[i], open, high, low, close, Number.isFinite(vol) ? vol : 0]);
+        }
+      }
+      return out;
+    };
+
+    try {
+      // First attempt with provided ticker
+      let res = await doFetch(ticker, interval);
+      if (res.status === 404) {
+        // Retry once toggling caret prefix (handles NSEI vs ^NSEI)
+        const alt = ticker.startsWith('^') ? ticker.slice(1) : `^${ticker}`;
+        res = await doFetch(alt, interval);
+      }
+      if (res.status === 422 && interval !== '1d') {
+        // Retry with daily interval for symbols where intraday is unsupported
+        logger.warn(`Yahoo: 422 error for ${ticker} ${interval}, retrying with 1d interval`);
+        const daily = '1d';
+        let res2 = await doFetch(ticker, daily);
+        if (res2.status === 404) {
+          const alt = ticker.startsWith('^') ? ticker.slice(1) : `^${ticker}`;
+          res2 = await doFetch(alt, daily);
+        }
+        if (!res2.ok) {
+          logger.error(`Yahoo fetch failed even with 1d fallback: ${res2.status}`);
+          return [];
+        }
+        return await parse(res2);
+      }
+      if (!res.ok) {
+        logger.error(`Yahoo fetch failed for ${ticker} ${interval}: ${res.status}`);
+        return [];
+      }
+      return await parse(res);
+    } catch (e) {
+      logger.error('Yahoo fetch error', e);
+      return [];
+    }
+  }
+
   async fetchMarketData(symbol: string, timeframe: string, limit: number = 1000): Promise<OHLCV[]> {
     try {
+      if (this.isYahooStorageSymbol(symbol)) {
+        const ticker = this.storageToYahooTicker(symbol);
+        let interval = this.mapTimeframeToYahooInterval(timeframe);
+        let effectiveTimeframe = timeframe;
+        // If index ticker, some intraday intervals may be unsupported; fallback to daily preemptively
+        if (this.isYahooIndexTicker(ticker) && ['1m','2m','5m','15m','30m','60m','90m'].includes(interval)) {
+          logger.warn(`Yahoo index ticker ${ticker} does not support interval ${interval}; using 1d instead`);
+          interval = '1d';
+          effectiveTimeframe = '1d';
+        }
+        // Use last N candles by picking an approximate window
+        const tfMs = TIMEFRAME_MS[timeframe] ?? 3_600_000;
+        const endMs = Date.now();
+        const startMs = endMs - tfMs * Math.max(1, limit);
+        const ohlcv = await this.fetchYahooRange({ ticker, interval, startMs, endMs });
+        if (!ohlcv || ohlcv.length === 0) {
+          logger.warn(`No data received (Yahoo) for ${symbol} ${timeframe}`);
+          return [];
+        }
+        await this.storeMarketData(ohlcv, symbol, effectiveTimeframe);
+        logger.info(`Fetched ${ohlcv.length} candles (Yahoo) for ${symbol} ${effectiveTimeframe}`);
+        return ohlcv;
+      }
+
       await this.ensureExchange();
       const ohlcv = await this.exchange.fetchOHLCV(symbol, timeframe, undefined, limit);
 
@@ -315,7 +455,10 @@ export class DataPipeline {
     sleepMs?: number; // backoff between calls
   }): Promise<number> {
     const { symbol, timeframe, startMs, endMs, limitPerCall = 1000, sleepMs = 250 } = params;
-    await this.ensureExchange();
+    const isYahoo = this.isYahooStorageSymbol(symbol);
+    if (!isYahoo) {
+      await this.ensureExchange();
+    }
 
     const tfMs = TIMEFRAME_MS[timeframe];
     if (!tfMs) throw new Error(`Unsupported timeframe ${timeframe}`);
@@ -325,12 +468,37 @@ export class DataPipeline {
 
     while (since < endMs) {
       try {
-        const ohlcv = await this.exchange.fetchOHLCV(symbol, timeframe, since, limitPerCall);
+        let ohlcv: OHLCV[] = [];
+        if (isYahoo) {
+          const ticker = this.storageToYahooTicker(symbol);
+          let interval = this.mapTimeframeToYahooInterval(timeframe);
+          // Track actual timeframe being used for chunking (may differ for Yahoo index)
+          let effectiveTfMs = tfMs;
+          let effectiveTimeframe = timeframe;
+
+          // Yahoo index tickers don't support intraday intervals
+          if (this.isYahooIndexTicker(ticker) && ['1m','2m','5m','15m','30m','60m','90m'].includes(interval)) {
+            logger.warn(`Yahoo index ticker ${ticker} does not support interval ${interval}; using 1d instead`);
+            interval = '1d';
+            effectiveTfMs = TIMEFRAME_MS['1d'];
+            effectiveTimeframe = '1d';
+          }
+
+          const next = Math.min(since + effectiveTfMs * limitPerCall, endMs);
+          ohlcv = await this.fetchYahooRange({ ticker, interval, startMs: since, endMs: next });
+        } else {
+          ohlcv = await this.exchange.fetchOHLCV(symbol, timeframe, since, limitPerCall);
+        }
         if (!ohlcv || ohlcv.length === 0) {
           // advance one step to avoid infinite loop
-          since += tfMs * limitPerCall;
+          // If Yahoo, use the effective timeframe used for chunking; otherwise original tfMs
+          const stepMs = isYahoo ? (this.isYahooIndexTicker(this.storageToYahooTicker(symbol)) ? TIMEFRAME_MS['1d'] : tfMs) : tfMs;
+          since += stepMs * limitPerCall;
         } else {
-          await this.storeMarketData(ohlcv, symbol, timeframe);
+          // If Yahoo with effective 1d fallback, store under 1d timeframe to avoid misleading entries
+          const ticker = isYahoo ? this.storageToYahooTicker(symbol) : '';
+          const storeTf = (isYahoo && this.isYahooIndexTicker(ticker) && ['1m','2m','5m','15m','30m','60m','90m'].includes(this.mapTimeframeToYahooInterval(timeframe))) ? '1d' : timeframe;
+          await this.storeMarketData(ohlcv, symbol, storeTf);
           inserted += ohlcv.length;
 
           const lastTs = ohlcv[ohlcv.length - 1][0] as number;
@@ -340,9 +508,11 @@ export class DataPipeline {
         if (sleepMs > 0) await new Promise(r => setTimeout(r, sleepMs));
       } catch (e: any) {
         const msg = e?.message || String(e);
-        // logger.warn(`Rate/error on fetch: ${symbol} ${timeframe} since=${since}: ${msg}`);
-        // Exponential backoff on rate limits
+        logger.warn(`Error fetching ${symbol} ${timeframe} since=${new Date(since).toISOString()}: ${msg}`);
+        // Exponential backoff on rate limits, but also advance cursor to avoid infinite loops
         await new Promise(r => setTimeout(r, Math.min(5000, sleepMs * 4)));
+        const stepMs = isYahoo ? (this.isYahooIndexTicker(this.storageToYahooTicker(symbol)) ? TIMEFRAME_MS['1d'] : tfMs) : tfMs;
+        since += stepMs * limitPerCall; // Advance to prevent infinite retry on same chunk
       }
       // Protect from runaway loops
       if ((endMs - since) / tfMs < 1) break;

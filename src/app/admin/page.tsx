@@ -10,7 +10,6 @@ export default function AdminPage() {
         <BackfillCard />
         <ExportCard />
         <WindowsCard />
-        <TrainingCard />
         <SupervisedAgentsCard />
         <FeedbackSuggestionsCard />
         <CoverageCard />
@@ -98,55 +97,6 @@ function WindowsCard() {
   return (
     <Card title="Build Windows (JSONL)" loading={loading} onSubmit={onSubmit}>
       <FormGrid state={form} setState={setForm} fields={[ 'symbol','timeframe','start','end','windowSize','stride','maskRatio' ]} />
-    </Card>
-  );
-}
-
-function TrainingCard() {
-  const [form, setForm] = useState({
-    symbol: 'BTC_USDT', timeframe: '1h', windowSize: 512, maskRatio: 0.15, epochs: 2, limit: 2000
-  });
-  const [loading, setLoading] = useState(false);
-  const [progress, setProgress] = useState<string[]>([]);
-  useEffect(() => {
-    const socket: Socket = io({ path: '/api/socketio' });
-    const handler = (evt: any) => {
-      const { phase, epoch, loss, message } = evt || {};
-      const line = [
-        new Date().toLocaleTimeString(),
-        phase?.toUpperCase?.(),
-        epoch ? `epoch=${epoch}` : undefined,
-        Number.isFinite(loss) ? `loss=${Number(loss).toFixed(6)}` : undefined,
-        message,
-      ].filter(Boolean).join(' · ');
-      setProgress((p) => [line, ...p].slice(0, 200));
-    };
-    socket.on('train:progress', handler);
-    return () => {
-      socket.off('train:progress', handler);
-      socket.close();
-    };
-  }, []);
-  const onSubmit = async () => {
-    setLoading(true);
-    try {
-      const res = await fetch('/api/train', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(form) });
-      const json = await res.json();
-      alert(JSON.stringify(json));
-    } finally { setLoading(false); }
-  };
-  return (
-    <Card title="Unsupervised Training" loading={loading} onSubmit={onSubmit}>
-      <FormGrid state={form} setState={setForm} fields={[ 'symbol','timeframe','windowSize','maskRatio','epochs','limit' ]} />
-      <div className="mt-3 max-h-48 overflow-auto border rounded p-2 text-xs font-mono bg-gray-50">
-        {progress.length === 0 ? (
-          <div className="text-gray-500">No progress yet. Start training to see updates…</div>
-        ) : (
-          <ul className="space-y-1">
-            {progress.map((l, i) => (<li key={i}>{l}</li>))}
-          </ul>
-        )}
-      </div>
     </Card>
   );
 }

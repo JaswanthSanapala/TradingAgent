@@ -1,8 +1,41 @@
 import { prisma } from '@/lib/db';
-import { predictAction, buildFeatures } from '@/lib/ml-utils';
+import { predictAction } from '@/lib/ml-utils';
 import { socketBus, PREDICTION_CREATED_EVENT } from '@/lib/socket-bus';
+import { buildMtfWindow, pickBaseTimeframe } from '@/lib/mtf';
+import { maybeAutoTrade } from '@/lib/auto-trader';
 
 // buildFeatures imported from '@/lib/ml-utils'
+
+// Helper: read MTF timeframes from Strategy.parameters.compiled.metadata.mtf.timeframes
+async function getMtfTimeframes(strategyId: string): Promise<string[] | undefined> {
+  try {
+    const s = await prisma.strategy.findUnique({ where: { id: strategyId }, select: { parameters: true } });
+    const p: any = s?.parameters || {};
+    const tfs: string[] | undefined = p?.compiled?.metadata?.mtf?.timeframes;
+    if (Array.isArray(tfs) && tfs.length) return Array.from(new Set(tfs.map(x => String(x).trim().toLowerCase())));
+  } catch {}
+  return undefined;
+}
+
+async function getStrategyIndicators(strategyId: string): Promise<string[] | undefined> {
+  try {
+    const s = await prisma.strategy.findUnique({ where: { id: strategyId }, select: { parameters: true } });
+    const p: any = s?.parameters || {};
+    const inds: string[] | undefined = p?.compiled?.metadata?.indicators;
+    if (Array.isArray(inds) && inds.length) return Array.from(new Set(inds.map(x => String(x))));
+  } catch {}
+  return undefined;
+}
+
+async function getSmcFeatures(strategyId: string): Promise<string[] | undefined> {
+  try {
+    const s = await prisma.strategy.findUnique({ where: { id: strategyId }, select: { parameters: true } });
+    const p: any = s?.parameters || {};
+    const feats: string[] | undefined = p?.compiled?.metadata?.smc?.features;
+    if (Array.isArray(feats) && feats.length) return Array.from(new Set(feats.map(x => String(x))));
+  } catch {}
+  return undefined;
+}
 
 export async function predictForAgent(params: {
   agentId: string;
@@ -14,67 +47,69 @@ export async function predictForAgent(params: {
   const agent = await prisma.agent.findUnique({ where: { id: params.agentId } });
   if (!agent || !agent.modelPath) throw new Error('Agent or model not found');
 
-  // Load latest window
-  const md = await prisma.marketData.findMany({
-    where: { symbol: params.symbol, timeframe: params.timeframe },
-    orderBy: { timestamp: 'desc' },
-    take: params.lookback + 1,
-    include: { indicators: true },
-  });
-  if (md.length < params.lookback) throw new Error('Not enough data for prediction');
-  const rows = md.reverse().slice(-params.lookback);
-  const feats = rows.map((r) => buildFeatures({ ...r, ...(r as any).indicators?.[0] }));
+  // Prefer MTF timeframes from strategy IR; fallback to provided timeframe
+  const mtf = await getMtfTimeframes(params.strategyId);
+  const indicators = await getStrategyIndicators(params.strategyId);
+  const smcFeatures = await getSmcFeatures(params.strategyId);
+  let feats: number[][];
+  let ts: Date;
+  let baseClose: number | undefined;
+  if (mtf && mtf.length) {
+    const { baseTf, windows } = await buildMtfWindow({ symbol: params.symbol, timeframes: mtf, lookback: params.lookback, limit: 5000, indicators: indicators || [], smcFeatures: smcFeatures || [] });
+    if (!windows.length) throw new Error('Not enough data for MTF prediction');
+    const last = windows[windows.length - 1];
+    feats = last.feats;
+    ts = last.ts as Date;
+    const lastRow = await prisma.marketData.findFirst({ where: { symbol: params.symbol, timeframe: baseTf, timestamp: ts }, select: { close: true } });
+    baseClose = lastRow?.close;
+  } else {
+    const md = await prisma.marketData.findMany({
+      where: { symbol: params.symbol, timeframe: params.timeframe },
+      orderBy: { timestamp: 'desc' },
+      take: params.lookback + 1,
+    });
+    if (md.length < params.lookback) throw new Error('Not enough data for prediction');
+    const rows = md.reverse().slice(-params.lookback);
+    // If indicators requested in strategy, join them for single timeframe
+    let indMap: Map<number, any> | undefined;
+    const fields = indicators && indicators.length ? indicators : [];
+    if (fields.length) {
+      const tsList = rows.map(r => r.timestamp);
+      const inds = await prisma.indicator.findMany({ where: { symbol: params.symbol, timeframe: params.timeframe, timestamp: { in: tsList } } });
+      indMap = new Map(inds.map(i => [i.timestamp.getTime(), i]));
+    }
+    feats = rows.map((r) => {
+      const base = [r.open, r.high, r.low, r.close, r.volume];
+      if (!indMap || !fields.length) return base;
+      const row = indMap.get(r.timestamp.getTime());
+      const ext = fields.map(f => (row && typeof (row as any)[f] === 'number') ? (row as any)[f] as number : 0);
+      return base.concat(ext);
+    });
+    ts = rows[rows.length - 1].timestamp as Date;
+    baseClose = rows[rows.length - 1].close;
+  }
 
   const { action, confidence, probs } = await predictAction(agent.modelPath, feats);
 
-  // Risk sizing via ATR multiplier from strategy parameters (fallback defaults)
-  const strategy = await prisma.strategy.findUnique({ where: { id: params.strategyId } });
-  const sParams: any = strategy?.parameters || {};
-  const atrMult = sParams.risk?.atrMultiplier ?? 1.5;
-  const rr = sParams.risk?.riskReward ?? 1.5;
-
-  const last = rows[rows.length - 1];
-  const ind = (rows[rows.length - 1] as any).indicators?.[0] || {};
-  const atr = ind?.atr ?? 0;
+  // No indicator-derived SL/TP here (user requested no indicators). Leave sizing to execution policy or strategy params.
   let stopLoss: number | undefined;
   let takeProfit: number | undefined;
-  if (action === 'buy') {
-    stopLoss = last.close - atrMult * atr;
-    takeProfit = last.close + rr * (last.close - (stopLoss ?? last.close));
-  } else if (action === 'sell') {
-    stopLoss = last.close + atrMult * atr;
-    takeProfit = last.close - rr * ((stopLoss ?? last.close) - last.close);
-  }
 
-  // Build a lightweight rationale string from indicators
-  const rsi = ind?.rsi as number | undefined;
-  const macd = ind?.macd as number | undefined;
-  const macdSignal = ind?.macdSignal as number | undefined;
-  const bbUpper = ind?.bbUpper as number | undefined;
-  const bbLower = ind?.bbLower as number | undefined;
-  const bbPos = bbUpper && bbLower ? (last.close - bbLower) / Math.max(1e-6, (bbUpper - bbLower)) : undefined;
-  const macdHist = macd !== undefined && macdSignal !== undefined ? macd - macdSignal : undefined;
-  const rationales: string[] = [];
-  if (rsi !== undefined) rationales.push(`RSI ${rsi.toFixed(1)}`);
-  if (macdHist !== undefined) rationales.push(`MACD hist ${macdHist >= 0 ? '+' : ''}${macdHist.toFixed(3)}`);
-  if (bbPos !== undefined) rationales.push(`BB pos ${(bbPos * 100).toFixed(0)}%`);
-  rationales.push(`ATR ${atr.toFixed(2)}`);
-  rationales.push(`Conf ${(confidence * 100).toFixed(0)}%`);
-  const rationale = `${action?.toUpperCase?.()}: ` + rationales.join(', ');
+  const rationale = `${action?.toUpperCase?.()}: Conf ${(confidence * 100).toFixed(0)}%`;
 
   const prediction = await prisma.tradePrediction.create({
     data: {
       agentId: params.agentId,
       strategyId: params.strategyId,
       symbol: params.symbol,
-      timeframe: params.timeframe,
-      timestamp: last.timestamp,
-      features: { lookback: params.lookback },
+      timeframe: mtf && mtf.length ? pickBaseTimeframe(mtf) : params.timeframe,
+      timestamp: ts,
+      features: { lookback: params.lookback, mtf: mtf && mtf.length ? mtf : undefined },
       action,
       confidence,
       stopLoss,
       takeProfit,
-      meta: { probs, indicators: ind, price: last.close, rationale, status: 'pending' },
+      meta: { probs, price: baseClose ?? null, rationale, status: 'pending' },
     },
   });
 
@@ -92,6 +127,23 @@ export async function predictForAgent(params: {
       stopLoss: prediction.stopLoss ?? null,
       takeProfit: prediction.takeProfit ?? null,
       meta: prediction.meta,
+    });
+  } catch {}
+
+  // Auto-trading: attempt execution based on policy (dev default ON)
+  try {
+    const policy = (agent as any)?.parameters?.policy;
+    await maybeAutoTrade({
+      prediction: {
+        id: prediction.id,
+        agentId: prediction.agentId,
+        strategyId: prediction.strategyId,
+        symbol: prediction.symbol,
+        timeframe: prediction.timeframe,
+        action: prediction.action as any,
+        confidence: prediction.confidence,
+      },
+      policy,
     });
   } catch {}
 

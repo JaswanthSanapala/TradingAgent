@@ -1,8 +1,14 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/db';
 import { trainSupervised, trainWalkForward, tuneSupervised } from '@/lib/supervised-trainer';
+import { PPOTrainer, PPOHyperParams } from '@/lib/rl-trainer';
+import { EnvConfig } from '@/lib/rl-env';
 
 export const dynamic = 'force-dynamic';
+
+// Keep a single trainers map globally (used by RL training mode)
+const trainers = (global as any).__ppo_trainers__ as Map<string, PPOTrainer> || new Map<string, PPOTrainer>();
+(global as any).__ppo_trainers__ = trainers;
 
 export async function POST(
   request: NextRequest,
@@ -20,7 +26,7 @@ export async function POST(
       batchSize = 64,
       limit = 5000,
       learningRate,
-      mode = 'standard', // 'standard' | 'walk_forward' | 'tune'
+      mode = 'standard', // 'standard' | 'walk_forward' | 'tune' | 'rl'
       labelingMode = 'future_return', // 'future_return' | 'imitation_strategy'
       strategySource,
       // walk-forward options
@@ -30,10 +36,15 @@ export async function POST(
       // tuning options
       grid,
       walkForward,
+      // rl options (only used when mode==='rl')
+      window = 64,
+      episodeSteps = 2048,
+      hparams,
+      datasetId,
     } = body || {};
 
     // Basic validation
-    const validModes = new Set(['standard', 'walk_forward', 'tune']);
+    const validModes = new Set(['standard', 'walk_forward', 'tune', 'rl']);
     if (!validModes.has(mode)) {
       return NextResponse.json({ success: false, error: 'Invalid mode' }, { status: 400 });
     }
@@ -70,7 +81,57 @@ export async function POST(
       const ok = [train, val, test].every((x) => typeof x === 'number' && x >= 0) && Math.abs((train ?? 0) + (val ?? 0) + (test ?? 0) - 1) < 1e-6;
       if (!ok) return NextResponse.json({ success: false, error: 'ratios.train/val/test must sum to 1' }, { status: 400 });
     }
-    if (mode === 'walk_forward') {
+    if (mode === 'rl') {
+      // RL training path (migrated from /api/agents/[id]/rl/train)
+      const envCfg: EnvConfig = { symbol, timeframe, window, episode: { steps: episodeSteps } } as any;
+      const hp: PPOHyperParams = {
+        gamma: 0.99,
+        gaeLambda: 0.95,
+        clipRatio: 0.2,
+        entropyCoef: 0.01,
+        valueCoef: 0.5,
+        lr: 1e-4,
+        rolloutSteps: 512,
+        batchSize: 512,
+        minibatchSize: 128,
+        epochs: 4,
+        ...(hparams || {}),
+      };
+
+      // Resolve dataset if datasetId provided
+      let resolvedSymbol = symbol;
+      let resolvedTimeframe = timeframe;
+      if (datasetId) {
+        const m = await prisma.coverageManifest.findUnique({ where: { id: datasetId } });
+        if (!m) return NextResponse.json({ success: false, error: 'Dataset not found' }, { status: 404 });
+        resolvedSymbol = m.symbol;
+        resolvedTimeframe = m.timeframe;
+      }
+      (envCfg as any).symbol = resolvedSymbol;
+      (envCfg as any).timeframe = resolvedTimeframe;
+
+      const paramsJson: any = {
+        envCfg: { ...(envCfg as any) },
+        hp: { ...(hp as any) },
+        datasetId: datasetId || null,
+      };
+      const run = await prisma.trainingRun.create({ data: { agentId, runType: 'rl', params: paramsJson, status: 'running' } });
+
+      let trainer = trainers.get(agentId);
+      if (!trainer) {
+        trainer = new PPOTrainer({ agentId, envCfg, hparams: hp });
+        trainers.set(agentId, trainer);
+      }
+
+      // fire and forget
+      trainer.start({ trainingRunId: run.id }).then(async () => {
+        await prisma.trainingRun.update({ where: { id: run.id }, data: { status: 'completed' } });
+      }).catch(async (e) => {
+        await prisma.trainingRun.update({ where: { id: run.id }, data: { status: 'failed', metrics: { error: String(e?.message || e) } } });
+      });
+
+      return NextResponse.json({ success: true, mode: 'rl', runId: run.id });
+    } else if (mode === 'walk_forward') {
       if ((folds !== undefined && !isPosInt(folds)) || (step !== undefined && !isPosInt(step))) {
         return NextResponse.json({ success: false, error: 'folds/step must be positive integers' }, { status: 400 });
       }

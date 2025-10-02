@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/db';
-import { resolveSymbol } from '@/lib/symbols';
+import { resolveSymbol, autoResolveSymbol, isYahooIndexStorageSymbol } from '@/lib/symbols';
 
 export const dynamic = 'force-dynamic';
 
@@ -38,7 +38,7 @@ export async function GET(req: NextRequest) {
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json().catch(() => ({}));
-    const { symbol, timeframe, exchangeId = 'binance', startDate, endDate, notes } = body || {};
+    const { symbol, timeframe, exchangeId, startDate, endDate, notes } = body || {};
     if (!symbol || !timeframe || !startDate || !endDate) {
       return NextResponse.json({ ok: false, error: 'symbol, timeframe, startDate, endDate are required' }, { status: 400 });
     }
@@ -52,15 +52,30 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ ok: false, error: 'endDate must be after startDate' }, { status: 400 });
     }
 
-    const resolved = await resolveSymbol(exchangeId, symbol);
-    if (!resolved.ok) return NextResponse.json(resolved, { status: 400 });
-    if (resolved.ok && !resolved.matched) {
-      return NextResponse.json({ ok: false, error: 'unrecognized symbol', suggestions: resolved.suggestions }, { status: 400 });
+    // If client sent an already normalized Yahoo Finance storage symbol (e.g., YF__NSEI), accept directly
+    let storageSymbol: string;
+    let finalExchangeId: string;
+    if (!exchangeId && typeof symbol === 'string' && /^\s*YF_[A-Za-z0-9_]+\s*$/.test(symbol)) {
+      storageSymbol = symbol.trim().toUpperCase();
+      finalExchangeId = 'yahoo';
+    } else {
+      const resolved = exchangeId ? await resolveSymbol(exchangeId, symbol) : await autoResolveSymbol(symbol);
+      if (!resolved.ok) return NextResponse.json(resolved, { status: 400 });
+      if (resolved.ok && !resolved.matched) {
+        return NextResponse.json({ ok: false, error: 'unrecognized symbol', suggestions: (resolved as any).suggestions }, { status: 400 });
+      }
+      storageSymbol = (resolved as any).result.storageSymbol;
+      finalExchangeId = (resolved as any).exchangeId || exchangeId || 'unknown';
     }
 
-    const storageSymbol = resolved.result.storageSymbol;
+    // For Yahoo index symbols, intraday timeframes are not supported. Coerce to 1d.
+    let finalTimeframe = timeframe;
+    if (finalExchangeId === 'yahoo' && isYahooIndexStorageSymbol(storageSymbol) && /^(1m|3m|5m|15m|30m|1h|2h|4h)$/i.test(finalTimeframe)) {
+      finalTimeframe = '1d';
+    }
+
     const created = await prisma.coverageManifest.create({
-      data: { symbol: storageSymbol, timeframe, exchangeId, startDate: start, endDate: end, notes: notes || null },
+      data: { symbol: storageSymbol, timeframe: finalTimeframe, exchangeId: finalExchangeId, startDate: start, endDate: end, notes: notes || null },
     });
     return NextResponse.json({ ok: true, item: created });
   } catch (e: any) {
