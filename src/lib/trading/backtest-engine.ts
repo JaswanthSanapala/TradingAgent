@@ -1,9 +1,12 @@
+import { buildFeaturesFromSpec,predictAction } from '@lib/ml/ml-utils';
+import { buildRuntimeFromSpec } from '@lib/strategy/strategy-runtime';
+import fs from 'fs';
+import path from 'path';
+
 import { prisma } from '@/lib/db';
 import { logger } from '@/lib/logger';
-import path from 'path';
-import fs from 'fs';
-import { predictAction, buildFeaturesFromSpec } from '@/lib/ml-utils';
-import { buildMtfWindow, pickBaseTimeframe } from '@/lib/mtf';
+import { MarketRegistry } from '@/lib/market/registry';
+import { buildMtfWindow } from '@/lib/mtf';
 
 export interface BacktestConfig {
   startDate: Date;
@@ -118,6 +121,12 @@ export class BacktestEngine {
 
   private async getMarketData(): Promise<any[]> {
     try {
+      const provider = MarketRegistry.get()
+      if (provider) {
+        const candles = await provider.getCandles({ symbol: this.config.symbol, timeframe: this.config.timeframe, from: this.config.startDate, to: this.config.endDate })
+        // Shape to existing structure (include indicators if needed via separate fetch in future)
+        return candles.map(c => ({ timestamp: c.timestamp, open: c.open, high: c.high, low: c.low, close: c.close, volume: c.volume ?? null, timeframe: c.timeframe ?? this.config.timeframe, symbol: c.symbol ?? this.config.symbol, indicators: {} }))
+      }
       return await prisma.marketData.findMany({
         where: {
           symbol: this.config.symbol,
@@ -197,6 +206,17 @@ export class BacktestEngine {
 
   private async getAgentDecision(agentModel: any, marketData: any[]): Promise<any> {
     try {
+      // First, if a StrategySpec exists, use the modular runtime to decide
+      const params: any = agentModel.strategy?.parameters || {};
+      const spec = params?.spec;
+      if (spec) {
+        const candles = marketData.map((r: any) => ({ open: r.open, high: r.high, low: r.low, close: r.close, volume: r.volume, timestamp: r.timestamp }))
+        if (candles.length < 5) return null;
+        const runtime = buildRuntimeFromSpec(spec);
+        const out = runtime.compute({ candles, symbol: marketData[0].symbol, timeframe: marketData[0].timeframe });
+        return { action: out.action, confidence: out.confidence, stopLoss: out.stopLoss, takeProfit: out.takeProfit, positionSize: out.positionSize };
+      }
+
       if (!agentModel || !agentModel.modelPath || !agentModel.lookback) return null;
       const lb = agentModel.lookback as number;
       if (marketData.length < lb) return null;
@@ -211,7 +231,7 @@ export class BacktestEngine {
       if (mtf && mtf.length) {
         // Build MTF features for the same symbol/timeframes; align to last timestamp
         const symbol = windowRows[windowRows.length - 1].symbol as string;
-        const { baseTf, windows } = await buildMtfWindow({ symbol, timeframes: Array.from(new Set(mtf)), lookback: lb, limit: 5000, indicators: indicators || [], smcFeatures: [] });
+        const { windows } = await buildMtfWindow({ symbol, timeframes: Array.from(new Set(mtf)), lookback: lb, limit: 5000, indicators: indicators || [], smcFeatures: [] });
         if (!windows.length) return null;
         window = windows[windows.length - 1].feats;
       } else {
@@ -248,33 +268,39 @@ export class BacktestEngine {
 
       // Calculate risk management parameters
       const riskAmount = this.currentBalance * this.config.maxRiskPerTrade;
-      const atr = await this.getCurrentATR(); // Get current ATR for stop loss calculation
-      
-      if (!atr) return null;
+      let stopLoss: number | undefined = decision.stopLoss;
+      let takeProfit: number | undefined = decision.takeProfit;
+      let positionSize: number | undefined = decision.positionSize;
 
-      // Calculate position size and stop loss/take profit
-      const stopLossDistance = atr * 1.5; // 1.5x ATR for stop loss
-      const takeProfitDistance = stopLossDistance * this.config.minRewardRiskRatio;
-
-      let stopLoss: number, takeProfit: number;
-
-      if (decision.action === 'buy') {
-        stopLoss = currentPrice - stopLossDistance;
-        takeProfit = currentPrice + takeProfitDistance;
-      } else {
-        stopLoss = currentPrice + stopLossDistance;
-        takeProfit = currentPrice - takeProfitDistance;
+      // If runtime didn't provide SL/TP/size, fall back to ATR-based policy
+      if (stopLoss === undefined || takeProfit === undefined || positionSize === undefined) {
+        const atr = await this.getCurrentATR();
+        if (!atr) return null;
+        const stopLossDistance = atr * 1.5;
+        const takeProfitDistance = stopLossDistance * this.config.minRewardRiskRatio;
+        if (decision.action === 'buy') {
+          stopLoss = currentPrice - stopLossDistance;
+          takeProfit = currentPrice + takeProfitDistance;
+        } else {
+          stopLoss = currentPrice + stopLossDistance;
+          takeProfit = currentPrice - takeProfitDistance;
+        }
+        positionSize = riskAmount / stopLossDistance;
       }
 
-      const positionSize = riskAmount / stopLossDistance;
+      const provider = MarketRegistry.get()
+      // Normalize price/size per market conventions if provider available
+      const normStop = provider ? await provider.normalizePrice(this.config.symbol, stopLoss!) : stopLoss!
+      const normTp = provider ? await provider.normalizePrice(this.config.symbol, takeProfit!) : takeProfit!
+      const normSize = provider ? await provider.normalizeSize(this.config.symbol, positionSize!) : positionSize!
 
       const trade: Trade = {
         id: `trade_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
         entryTime,
         entryPrice: currentPrice,
-        stopLoss,
-        takeProfit,
-        positionSize,
+        stopLoss: normStop,
+        takeProfit: normTp,
+        positionSize: normSize,
         action: decision.action,
         status: 'open',
         agentId,
@@ -669,6 +695,7 @@ export class BacktestEngine {
       for (const trade of results.trades) {
         await prisma.trade.create({
           data: {
+            symbol: this.config.symbol,
             backtestId: backtest.id,
             agentId,
             strategyId,

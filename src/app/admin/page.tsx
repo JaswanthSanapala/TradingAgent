@@ -1,6 +1,5 @@
 "use client";
-import React, { useEffect, useMemo, useState } from 'react';
-import { io, Socket } from 'socket.io-client';
+import React, { useEffect, useState } from 'react';
 
 export default function AdminPage() {
   return (

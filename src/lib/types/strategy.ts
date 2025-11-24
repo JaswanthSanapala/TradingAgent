@@ -30,6 +30,7 @@ export type StrategySpec = {
   indicators?: IndicatorRef[]
   rules?: string[]
   risk?: RiskSettings
+  patterns?: string[]
 }
 
 export type Ctx = {

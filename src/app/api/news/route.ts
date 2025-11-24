@@ -1,4 +1,5 @@
 import { NextRequest } from "next/server";
+
 import { CONFIG } from '@/lib/config';
 import { classifyNews } from "@/lib/news-agent";
 

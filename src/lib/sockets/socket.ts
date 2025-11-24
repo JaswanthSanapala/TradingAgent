@@ -1,5 +1,5 @@
+import { PREDICTION_CREATED_EVENT, PREDICTION_UPDATED_EVENT, socketBus, TRADE_CREATED_EVENT,TRAIN_PROGRESS_EVENT } from '@lib/sockets/socket-bus';
 import { Server } from 'socket.io';
-import { socketBus, TRAIN_PROGRESS_EVENT, PREDICTION_CREATED_EVENT, PREDICTION_UPDATED_EVENT, TRADE_CREATED_EVENT } from '@/lib/socket-bus';
 
 export const setupSocket = (io: Server) => {
   // Relay training progress to all clients

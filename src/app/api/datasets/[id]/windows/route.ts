@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
+
 import { prisma } from '@/lib/db';
-import { queues, defaultJobOpts, WindowsJobData } from '@/lib/queue';
+import { defaultJobOpts, queues, WindowsJobData } from '@/lib/queue';
 
 export const dynamic = 'force-dynamic';
 

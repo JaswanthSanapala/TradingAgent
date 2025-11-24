@@ -1,9 +1,10 @@
+import { compileStrategy } from '@lib/strategy/strategy-compiler';
+import { parseSystemMarkdown,validateSystemMarkdown } from '@lib/strategy/strategy-loader';
+import { mkdir,writeFile } from 'fs/promises';
 import { NextRequest, NextResponse } from 'next/server';
-import { prisma } from '@/lib/db';
-import { writeFile, mkdir } from 'fs/promises';
 import path from 'path';
-import { validateSystemMarkdown, parseSystemMarkdown } from '@/lib/strategy-loader';
-import { compileStrategy } from '@/lib/strategy-compiler';
+
+import { prisma } from '@/lib/db';
 
 export const dynamic = 'force-dynamic';
 

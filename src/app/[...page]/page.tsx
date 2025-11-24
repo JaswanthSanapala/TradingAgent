@@ -1,5 +1,5 @@
-import { notFound } from "next/navigation";
 import dynamic from "next/dynamic";
+import { notFound } from "next/navigation";
 
 const pages = {
   features: dynamic(() => import("@/components/pages/features")),

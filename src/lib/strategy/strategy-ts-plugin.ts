@@ -1,4 +1,5 @@
 import path from 'path';
+
 import { StrategyAction, StrategyContext, StrategyProvider, StrategySource } from './strategy-provider';
 
 export class TsPluginStrategyProvider implements StrategyProvider {

@@ -25,7 +25,6 @@ export async function analyzeStopLossAndTiming(input: AnalysisInput): Promise<An
     include: { indicators: true },
   });
   const rows = md.reverse();
-  const last = rows[rows.length - 1];
   const atrSeries = rows.map((r: any) => r.indicators?.[0]?.atr ?? null).filter((v) => v != null) as number[];
   const rsiSeries = rows.map((r: any) => r.indicators?.[0]?.rsi ?? null).filter((v) => v != null) as number[];
 

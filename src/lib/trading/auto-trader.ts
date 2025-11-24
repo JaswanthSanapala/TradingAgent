@@ -1,6 +1,6 @@
+import { getBalance, getTickerPrice } from '@/lib/broker';
 import { CONFIG } from '@/lib/config';
 import { queues } from '@/lib/queue';
-import { getBalance, getTickerPrice } from '@/lib/broker';
 import { simpleSizeByQuote } from '@/lib/risk';
 
 function toCcxtSymbol(dbSymbol: string): string {

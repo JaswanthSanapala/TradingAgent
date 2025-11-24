@@ -1,7 +1,8 @@
+import { mkdir, unlink,writeFile } from 'fs/promises';
 import { NextRequest, NextResponse } from 'next/server';
-import { prisma } from '@/lib/db';
-import { writeFile, mkdir, unlink } from 'fs/promises';
 import path from 'path';
+
+import { prisma } from '@/lib/db';
 
 export async function PUT(
   request: NextRequest,
@@ -31,7 +32,7 @@ export async function PUT(
       );
     }
 
-    let updateData: any = {
+    const updateData: any = {
       name,
       description,
     };

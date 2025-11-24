@@ -1,6 +1,6 @@
+import { compileStrategy } from '@lib/strategy/strategy-compiler';
+import { parseSystemMarkdown,validateSystemMarkdown } from '@lib/strategy/strategy-loader';
 import { NextRequest, NextResponse } from 'next/server';
-import { validateSystemMarkdown, parseSystemMarkdown } from '@/lib/strategy-loader';
-import { compileStrategy } from '@/lib/strategy-compiler';
 
 export const dynamic = 'force-dynamic';
 

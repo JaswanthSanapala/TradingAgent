@@ -1,12 +1,13 @@
-import { Worker, Job } from 'bullmq';
-import { connection, RLJobData } from '@/lib/queue';
+import { Job,Worker } from 'bullmq';
+
 import { prisma } from '@/lib/db';
 import { createLogger } from '@/lib/logger';
-import { PPOTrainer, PPOHyperParams } from '@/lib/rl-trainer';
-import type { EnvConfig } from '@/lib/rl-env';
+import { makeRLMetrics } from '@/lib/trading/metrics';
+import { promote, prune,registerArtifact } from '@/lib/ml/model-registry';
+import { connection, RLJobData } from '@/lib/queue';
+import type { EnvConfig } from '@/lib/ml/rl-env';
+import { PPOHyperParams,PPOTrainer } from '@/lib/ml/rl-trainer';
 import { socketBus, TRAIN_PROGRESS_EVENT } from '@/lib/socket-bus';
-import { registerArtifact, promote, prune } from '@/lib/model-registry';
-import { makeRLMetrics } from '@/lib/metrics';
 
 const log = createLogger('RLWorker');
 

@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
+
 import { prisma } from '@/lib/db';
-import { socketBus, PREDICTION_UPDATED_EVENT, TRADE_CREATED_EVENT } from '@/lib/socket-bus';
+import { PREDICTION_UPDATED_EVENT, socketBus, TRADE_CREATED_EVENT } from '@/lib/socket-bus';
 
 export const dynamic = 'force-dynamic';
 

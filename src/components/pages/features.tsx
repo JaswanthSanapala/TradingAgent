@@ -1,5 +1,6 @@
+import { Activity, Brain, Database, FunctionSquare, Layers,Palette, Radio, Server, Settings, Shield } from "lucide-react";
+
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Brain, Activity, FunctionSquare, Database, Radio, Shield, Server, Settings, Palette, Layers } from "lucide-react";
 
 const features = [
   {

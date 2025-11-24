@@ -1,7 +1,7 @@
 "use client";
 
-import { ThemeProvider } from "@/components/theme-provider";
 import Header from "@/components/layout/Header";
+import { ThemeProvider } from "@/components/theme-provider";
 import { Toaster } from "@/components/ui/toaster";
 
 export function SiteLayout({ children }: { children: React.ReactNode }) {

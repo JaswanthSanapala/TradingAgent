@@ -1,7 +1,11 @@
 "use client";
+import { ArrowDownRight, ArrowUpRight, Banknote, Plus, Users } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { toast } from "sonner";
+
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import {
   Dialog,
   DialogContent,
@@ -13,13 +17,10 @@ import {
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
-import { ArrowUpRight, ArrowDownRight, Banknote, Plus, Users } from "lucide-react";
 import { Switch } from "@/components/ui/switch";
-import { toast } from "sonner";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
 type BrokerName = "Mock" | "Zerodha" | "Upstox" | "Angel One" | "Dhan" | "Fyers";
 

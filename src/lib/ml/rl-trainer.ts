@@ -1,9 +1,11 @@
 import type * as tft from '@tensorflow/tfjs';
 let tf: any;
 try { tf = require('@tensorflow/tfjs-node'); } catch { tf = require('@tensorflow/tfjs'); }
-import { TradingEnv, EnvConfig, Action } from './rl-env';
+import { existsSync,mkdirSync } from 'fs';
+
 import { socketBus, TRAIN_PROGRESS_EVENT } from '@/lib/socket-bus';
-import { mkdirSync, existsSync } from 'fs';
+
+import { Action,EnvConfig, TradingEnv } from './rl-env';
 
 export interface PPOHyperParams {
   gamma: number;
@@ -196,7 +198,7 @@ function sampleActionAndLogProb(logits: number[]): { act: number; lp: number } {
   const exps = logits.map(v => Math.exp(v - max));
   const sum = exps.reduce((a,b)=>a+b,0);
   const probs = exps.map(v => v/sum);
-  let r = Math.random();
+  const r = Math.random();
   let acc = 0;
   let idx = 0;
   for (let i=0;i<probs.length;i++){ acc += probs[i]; if (r<=acc){ idx=i; break; } }

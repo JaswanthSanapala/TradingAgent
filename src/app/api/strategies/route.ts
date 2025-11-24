@@ -1,10 +1,11 @@
-import { NextRequest, NextResponse } from 'next/server';
-import { prisma } from '@/lib/db';
-import { writeFile, mkdir } from 'fs/promises';
-import path from 'path';
-import { compileStrategy } from '@/lib/strategy-compiler';
-import { validateSystemMarkdown } from '@/lib/strategy-loader';
+import { compileStrategy } from '@lib/strategy/strategy-compiler';
+import { validateSystemMarkdown } from '@lib/strategy/strategy-loader';
 import { promises as fs } from 'fs';
+import { mkdir,writeFile } from 'fs/promises';
+import { NextRequest, NextResponse } from 'next/server';
+import path from 'path';
+
+import { prisma } from '@/lib/db';
 
 export const dynamic = 'force-dynamic';
 

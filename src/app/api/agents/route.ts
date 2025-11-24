@@ -1,7 +1,8 @@
+import { compileStrategy } from '@lib/strategy/strategy-compiler';
+import { defaultJobOpts, queues, SupervisedJobData } from '@lib/trading/queue';
 import { NextRequest, NextResponse } from 'next/server';
+
 import { prisma } from '@/lib/db';
-import { compileStrategy } from '@/lib/strategy-compiler';
-import { queues, defaultJobOpts, SupervisedJobData } from '@/lib/queue';
 
 // Durable job queue is used now; remove in-memory tracker
 
@@ -143,3 +144,4 @@ export async function DELETE(request: NextRequest) {
     return NextResponse.json({ success: false, error: 'Failed to delete agent' }, { status: 500 });
   }
 }
+

@@ -1,7 +1,9 @@
 import { Exchange, OHLCV } from 'ccxt';
+
 import { prisma } from '@/lib/db';
-import { TechnicalIndicators } from './technical-indicators';
 import { logger } from '@/lib/logger';
+
+import { TechnicalIndicators } from './technical-indicators';
 
 interface TimeframeConfig {
   name: string;

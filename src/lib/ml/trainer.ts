@@ -1,7 +1,7 @@
+import type * as tft from '@tensorflow/tfjs';
 import fs from 'fs';
 import fsp from 'fs/promises';
 import path from 'path';
-import type * as tft from '@tensorflow/tfjs';
 let tf: any; try { tf = require('@tensorflow/tfjs-node'); } catch { tf = require('@tensorflow/tfjs'); }
 import { logger } from '@/lib/logger';
 import { socketBus, TRAIN_PROGRESS_EVENT } from '@/lib/socket-bus';

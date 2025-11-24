@@ -1,11 +1,12 @@
 "use client";
 
+import { ArrowDownRight, ArrowUpRight, BarChart3, RefreshCw } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
-import { BarChart3, ArrowDownRight, ArrowUpRight, RefreshCw } from "lucide-react";
+import { Line, LineChart, ReferenceLine,ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 import { io, Socket } from "socket.io-client";
-import { ResponsiveContainer, LineChart, Line, XAxis, YAxis, Tooltip, ReferenceLine } from "recharts";
+
+import { Badge } from "@/components/ui/badge";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { toast } from "@/hooks/use-toast";
 
 type MarketItem = { key: string; label: string; symbol: string; changePct: number; marketState: string };

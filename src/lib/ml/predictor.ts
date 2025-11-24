@@ -1,8 +1,9 @@
+import { buildMtfWindow, pickBaseTimeframe } from '@lib/market/mtf';
+import { predictAction } from '@lib/ml/ml-utils';
+import { PREDICTION_CREATED_EVENT,socketBus } from '@lib/sockets/socket-bus';
+import { maybeAutoTrade } from '@lib/trading/auto-trader';
+
 import { prisma } from '@/lib/db';
-import { predictAction } from '@/lib/ml-utils';
-import { socketBus, PREDICTION_CREATED_EVENT } from '@/lib/socket-bus';
-import { buildMtfWindow, pickBaseTimeframe } from '@/lib/mtf';
-import { maybeAutoTrade } from '@/lib/auto-trader';
 
 // buildFeatures imported from '@/lib/ml-utils'
 

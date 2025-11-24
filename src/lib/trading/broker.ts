@@ -1,4 +1,5 @@
 import ccxt from 'ccxt';
+
 import { CONFIG } from '@/lib/config';
 import { prisma } from '@/lib/db';
 

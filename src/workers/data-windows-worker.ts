@@ -1,6 +1,7 @@
-import { Worker, Job } from 'bullmq';
-import { connection, WindowsJobData } from '@/lib/queue';
+import { Job,Worker } from 'bullmq';
+
 import { prisma } from '@/lib/db';
+import { connection, WindowsJobData } from '@/lib/queue';
 import { buildUnsupervisedWindows } from '@/lib/window-builder';
 
 export function startDataWindowsWorker() {

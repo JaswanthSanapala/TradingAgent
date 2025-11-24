@@ -1,20 +1,25 @@
 // server.ts - Next.js Standalone + Socket.IO
 import 'dotenv/config';
-import { setupSocket } from '@/lib/socket';
-import { CONFIG } from '@/lib/config';
+
 import { createServer } from 'http';
-import { Server } from 'socket.io';
 import next from 'next';
+import { Server } from 'socket.io';
+
+import { CONFIG } from '@/lib/config';
+import { PrismaMarketProvider } from '@/lib/market/providers/prisma-provider';
+import { MarketRegistry } from '@/lib/market/registry';
 import { startScheduler } from '@/lib/scheduler';
-import { startSupervisedWorker } from '@/workers/supervised-worker';
+import { setupSocket } from '@/lib/socket';
+import { scheduleCoverageTick,startCoverageWorker } from '@/workers/coverage-worker';
 import { startDataBackfillWorker } from '@/workers/data-backfill-worker';
 import { startDataExportWorker } from '@/workers/data-export-worker';
 import { startDataWindowsWorker } from '@/workers/data-windows-worker';
-import { startCoverageWorker, scheduleCoverageTick } from '@/workers/coverage-worker';
-import { startRLWorker } from '@/workers/rl-worker';
 import { startExecutionWorker } from '@/workers/execution-worker';
-import { startOrderPoller } from '@/workers/order-poller';
+import { startIngestionWorker } from '@/workers/ingestion-worker';
 import { startMarketStreamer } from '@/workers/market-streamer';
+import { startOrderPoller } from '@/workers/order-poller';
+import { startRLWorker } from '@/workers/rl-worker';
+import { startSupervisedWorker } from '@/workers/supervised-worker';
 import { startTpSlWatcher } from '@/workers/tp-sl-watcher';
 
 const dev = process.env.NODE_ENV !== 'production';
@@ -55,6 +60,11 @@ async function createCustomServer() {
 
     setupSocket(io);
 
+    // Register default market provider (Prisma-backed)
+    try {
+      MarketRegistry.set(new PrismaMarketProvider());
+    } catch {}
+
     // Start the server
     server.listen(currentPort, hostname, () => {
       console.log(`> Ready on http://${hostname}:${currentPort}`);
@@ -93,6 +103,9 @@ async function createCustomServer() {
         // Start RL worker
         startRLWorker();
         console.log('> Workers: RL worker started');
+        // Start Ingestion worker
+        startIngestionWorker();
+        console.log('> Workers: ingestion worker started');
         // Start data workers
         startDataBackfillWorker();
         startDataExportWorker();

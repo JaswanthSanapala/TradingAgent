@@ -1,5 +1,6 @@
 {
   "compilerOptions": {
+    "baseUrl": ".",
     "target": "ES2017",
     "lib": ["dom", "dom.iterable", "esnext"],
     "allowJs": true,
@@ -20,7 +21,34 @@
       }
     ],
     "paths": {
-      "@/*": ["./src/*"]
+      "@/*": ["./src/*"],
+      "@lib/*": ["./src/lib/*"],
+      "@lib/config": ["./src/lib/core/config"],
+      "@lib/db": ["./src/lib/core/db"],
+      "@lib/logger": ["./src/lib/core/logger"],
+      "@lib/bus": ["./src/lib/sockets/socket-bus"],
+      "@lib/socket-bus": ["./src/lib/sockets/socket-bus"],
+      "@lib/queue": ["./src/lib/trading/queue"],
+      "@lib/broker": ["./src/lib/trading/broker"],
+      "@lib/mtf": ["./src/lib/market/mtf"],
+      "@lib/scheduler": ["./src/lib/trading/scheduler"],
+      "@lib/strategy/*": ["./src/lib/strategy/*"],
+      "@lib/ml/*": ["./src/lib/ml/*"],
+      "@/lib/*": ["./src/lib/*"],
+      "@/lib/config": ["./src/lib/core/config"],
+      "@/lib/db": ["./src/lib/core/db"],
+      "@/lib/logger": ["./src/lib/core/logger"],
+      "@/lib/socket-bus": ["./src/lib/sockets/socket-bus"],
+      "@/lib/queue": ["./src/lib/trading/queue"],
+      "@/lib/broker": ["./src/lib/trading/broker"],
+      "@/lib/mtf": ["./src/lib/market/mtf"],
+      "@/lib/scheduler": ["./src/lib/trading/scheduler"],
+      "@components/*": ["./src/components/*"],
+      "@hooks/*": ["./src/hooks/*"],
+      "@services/*": ["./src/services/*"],
+      "@utils/*": ["./src/utils/*"],
+      "@store/*": ["./src/store/*"],
+      "@types/*": ["./src/types/*"]
     }
   },
   "include": ["next-env.d.ts", "**/*.ts", "**/*.tsx", ".next/types/**/*.ts"],

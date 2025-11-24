@@ -1,8 +1,8 @@
-import { CONFIG } from '@/lib/config';
-import { createLogger } from '@/lib/logger';
 import { getTickerPrice } from '@/lib/broker';
+import { CONFIG } from '@/lib/config';
 import { prisma } from '@/lib/db';
-import { queues, defaultJobOpts } from '@/lib/queue';
+import { createLogger } from '@/lib/logger';
+import { defaultJobOpts,queues } from '@/lib/queue';
 import { socketBus } from '@/lib/socket-bus';
 
 const log = createLogger('TpSlWatcher');

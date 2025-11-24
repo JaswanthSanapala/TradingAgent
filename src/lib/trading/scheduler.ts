@@ -1,7 +1,7 @@
+import { CONFIG } from '@/lib/config';
+import { DataPipeline, DataPipelineConfig } from '@/lib/data-pipeline';
 import { prisma } from '@/lib/db';
 import { createLogger } from '@/lib/logger';
-import { DataPipeline, DataPipelineConfig } from '@/lib/data-pipeline';
-import { CONFIG } from '@/lib/config';
 
 const log = createLogger('Scheduler');
 

@@ -1,19 +1,20 @@
 "use client";
 
+import { BarChart3,RefreshCw, Zap } from "lucide-react";
+import Link from "next/link";
 import { useEffect, useMemo, useRef, useState } from "react";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { CartesianGrid, Line, LineChart, ReferenceLine,ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
+import { io, Socket } from "socket.io-client";
+
+import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
-import { Zap, RefreshCw, BarChart3 } from "lucide-react";
-import { ResponsiveContainer, LineChart, Line, XAxis, YAxis, Tooltip, CartesianGrid, ReferenceLine } from "recharts";
 import { Switch } from "@/components/ui/switch";
-import { io, Socket } from "socket.io-client";
-import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import Link from "next/link";
 
 type Prediction = {
   id: string;
@@ -138,7 +139,7 @@ export default function TradesPage() {
   useEffect(() => {
     if (!agentId) return;
     loadPredictions();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+     
   }, [agentId, symbol, timeframe, latestOnly]);
 
   // Socket.IO live updates

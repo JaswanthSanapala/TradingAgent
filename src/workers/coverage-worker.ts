@@ -1,7 +1,8 @@
-import { Worker, Job, JobsOptions } from 'bullmq';
-import { connection, queues, defaultJobOpts } from '@/lib/queue';
-import { CoverageScheduler } from '@/lib/scheduler';
+import { Job,Worker } from 'bullmq';
+
 import { CONFIG } from '@/lib/config';
+import { connection, defaultJobOpts,queues } from '@/lib/queue';
+import { CoverageScheduler } from '@/lib/scheduler';
 
 export function startCoverageWorker() {
   const worker = new Worker(

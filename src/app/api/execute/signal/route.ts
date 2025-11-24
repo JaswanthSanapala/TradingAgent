@@ -1,9 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { CONFIG } from '@/lib/config';
+
 import { getBalance, getTickerPrice } from '@/lib/broker';
-import { simpleSizeByQuote } from '@/lib/risk';
-import { queues, defaultJobOpts, BrokerJobData } from '@/lib/queue';
+import { CONFIG } from '@/lib/config';
 import { prisma } from '@/lib/db';
+import { BrokerJobData,defaultJobOpts, queues } from '@/lib/queue';
+import { simpleSizeByQuote } from '@/lib/risk';
 
 export const dynamic = 'force-dynamic';
 

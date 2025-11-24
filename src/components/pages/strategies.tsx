@@ -1,16 +1,18 @@
 'use client';
 
-import { useState, useEffect, useRef } from 'react';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Edit, FileText, Loader2,Plus, Target, Trash2, Upload } from "lucide-react";
+import { useEffect, useRef,useState } from 'react';
+import { toast } from "sonner";
+
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Switch } from "@/components/ui/switch";
 import { Textarea } from "@/components/ui/textarea";
-import { Badge } from "@/components/ui/badge";
-import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
-import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
-import { Target, Plus, Edit, Trash2, FileText, Upload, Loader2 } from "lucide-react";
-import { toast } from "sonner";
 
 interface Strategy {
   id: string;
@@ -39,6 +41,9 @@ export default function StrategiesPage() {
   const [submitting, setSubmitting] = useState(false);
   const [fileContent, setFileContent] = useState<string>('');
   const [fileName, setFileName] = useState<string>('');
+  const [useOcr, setUseOcr] = useState(false);
+  const [useLLM, setUseLLM] = useState(true);
+  const [useAsync, setUseAsync] = useState(false);
   const [viewDialog, setViewDialog] = useState<{ open: boolean; title: string; content: string }>(
     { open: false, title: '', content: '' }
   );
@@ -79,13 +84,73 @@ export default function StrategiesPage() {
       if (fileContent && fileContent.trim().length > 0) {
         formDataToSend.append('fileContent', fileContent);
       }
+      // Include ingestion flags (Phase 2)
+      formDataToSend.append('useOcr', String(useOcr));
+      formDataToSend.append('useLLM', String(useLLM));
       // For updates, include the id to match /api/strategies PUT handler
       if (editingStrategy) {
         formDataToSend.append('id', editingStrategy.id);
       }
 
-      const url = editingStrategy ? '/api/strategies' : '/api/strategies/upload';
-      const method = editingStrategy ? 'PUT' : 'POST';
+      // Decide endpoint: use new ingest route when creating and either non-.md file or AI interpretation requested
+      let url = '/api/strategies/upload';
+      let method: 'POST' | 'PUT' = 'POST';
+      if (editingStrategy) {
+        url = '/api/strategies';
+        method = 'PUT';
+      } else {
+        const ext = fileName.split('.').pop()?.toLowerCase();
+        const isMd = ext === 'md';
+        if (!isMd || useLLM) {
+          // If background processing requested and a file is present, try async first
+          if (useAsync && formData.file) {
+            try {
+              const enqueueResp = await fetch('/api/strategies/ingest/async', { method: 'POST', body: formDataToSend });
+              const enqueueData = await enqueueResp.json();
+              if (enqueueResp.ok && enqueueData.success && enqueueData.jobId) {
+                toast.message('Ingestion started in background');
+                // Poll for completion
+                const startedAt = Date.now();
+                const timeoutMs = 2 * 60 * 1000; // 2 minutes
+                const poll = async () => {
+                  const statusResp = await fetch(`/api/strategies/ingest/status?jobId=${encodeURIComponent(enqueueData.jobId)}`);
+                  const status = await statusResp.json();
+                  if (!statusResp.ok || !status.success) {
+                    throw new Error(status.error || 'Status check failed');
+                  }
+                  if (status.state === 'completed' && status.result) {
+                    toast.success('Strategy ingested');
+                    setIsCreateDialogOpen(false);
+                    setEditingStrategy(null);
+                    setFormData({ name: '', description: '', file: null });
+                    setFileContent('');
+                    setFileName('');
+                    await fetchStrategies();
+                    return true;
+                  }
+                  if (status.state === 'failed') {
+                    throw new Error(status.failedReason || 'Ingestion failed');
+                  }
+                  if (Date.now() - startedAt > timeoutMs) {
+                    throw new Error('Timed out waiting for ingestion');
+                  }
+                  await new Promise(r => setTimeout(r, 2000));
+                  return await poll();
+                };
+                await poll();
+                return; // done
+              } else {
+                // Fallback to sync if async unavailable
+                toast.message('Async ingestion unavailable, falling back to synchronous');
+              }
+            } catch (err: any) {
+              toast.message('Async ingestion failed, falling back to synchronous');
+            }
+          }
+          url = '/api/strategies/ingest';
+          method = 'POST';
+        }
+      }
 
       const response = await fetch(url, {
         method,
@@ -150,21 +215,24 @@ export default function StrategiesPage() {
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
-      const allowedTypes = ['.md'];
-      const fileExtension = '.' + file.name.split('.').pop()?.toLowerCase();
-
-      if (allowedTypes.includes(fileExtension)) {
-        setFormData(prev => ({ ...prev, file }));
-        setFileName(file.name);
-        // Read file to allow preview/edit before upload
+      const ext = '.' + (file.name.split('.').pop()?.toLowerCase() || '');
+      const allowed = ['.md', '.txt', '.pdf', '.docx'];
+      if (!allowed.includes(ext) && !file.type.startsWith('image/')) {
+        toast.error('Unsupported file. Allowed: .md, .txt, .pdf, .docx, or image');
+        e.target.value = '';
+        return;
+      }
+      setFormData(prev => ({ ...prev, file }));
+      setFileName(file.name);
+      // Preview only for text-like files (.md/.txt)
+      if (ext === '.md' || ext === '.txt') {
         const reader = new FileReader();
         reader.onload = () => {
           setFileContent((reader.result as string) || '');
         };
         reader.readAsText(file);
       } else {
-        toast.error('Please upload a system-format .md strategy file');
-        e.target.value = '';
+        setFileContent('');
       }
     }
   };
@@ -251,7 +319,7 @@ export default function StrategiesPage() {
                       <Input
                         id="file"
                         type="file"
-                        accept=".md"
+                        accept=".md,.txt,.pdf,.docx,image/*"
                         onChange={handleFileChange}
                         className="cursor-pointer hidden"
                         ref={fileInputRef}
@@ -268,8 +336,31 @@ export default function StrategiesPage() {
                         </>
                       )}
                       <p className="text-xs text-muted-foreground basis-full">
-                        Upload a strategy as system-format Markdown (.md). You can write plain rules and sections (Overview, Timeframes, Risk Management, Indicators). We’ll parse and normalize it automatically—no code required.
+                        Upload .md, .txt, .pdf, .docx, or an image. Text files are previewable. PDFs/DOCX are converted to text during ingestion. Images may require OCR in later phases.
                       </p>
+                    </div>
+                  </div>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div className="flex items-center justify-between rounded-md border p-3">
+                      <div>
+                        <Label>Use AI to interpret strategy</Label>
+                        <p className="text-xs text-muted-foreground">Extract rules/spec from unstructured text during ingestion.</p>
+                      </div>
+                      <Switch checked={useLLM} onCheckedChange={setUseLLM} />
+                    </div>
+                    <div className="flex items-center justify-between rounded-md border p-3">
+                      <div>
+                        <Label>Use OCR for images</Label>
+                        <p className="text-xs text-muted-foreground">For scanned PDFs/images (enabled in later phase).</p>
+                      </div>
+                      <Switch checked={useOcr} onCheckedChange={setUseOcr} />
+                    </div>
+                    <div className="flex items-center justify-between rounded-md border p-3">
+                      <div>
+                        <Label>Process in background</Label>
+                        <p className="text-xs text-muted-foreground">Queue ingestion as a background job (recommended for large PDFs/images). Falls back to sync if unavailable.</p>
+                      </div>
+                      <Switch checked={useAsync} onCheckedChange={setUseAsync} />
                     </div>
                   </div>
                   {(fileContent || editingStrategy?.parameters?.fileContent) && (

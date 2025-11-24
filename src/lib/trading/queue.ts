@@ -1,5 +1,6 @@
-import { Queue, Worker, QueueEvents, JobsOptions, ConnectionOptions } from 'bullmq';
+import { ConnectionOptions,JobsOptions, Queue, QueueEvents } from 'bullmq';
 import IORedis from 'ioredis';
+
 import { CONFIG } from '@/lib/config';
 
 // Centralized BullMQ connection and queues

@@ -1,20 +1,21 @@
 'use client'
 
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
-import { Tabs, TabsContent } from "@/components/ui/tabs";
-import { Progress } from "@/components/ui/progress";
-import { Label } from "@/components/ui/label";
-import { Brain, Plus, Play, Pause, Trash2, Loader2, Database } from "lucide-react";
+import { Brain, Database,Loader2, Pause, Play, Plus, Trash2 } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
+import { CartesianGrid,Line, LineChart, XAxis, YAxis } from "recharts";
 import { toast } from "sonner";
-import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+
+import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { ChartContainer, ChartTooltip, ChartTooltipContent } from "@/components/ui/chart";
-import { Line, LineChart, XAxis, YAxis, CartesianGrid } from "recharts";
-import { getSocket } from "@/lib/socket-client";
-import { Input } from "@/components/ui/input";
 import { Checkbox } from "@/components/ui/checkbox";
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Progress } from "@/components/ui/progress";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Tabs, TabsContent } from "@/components/ui/tabs";
+import { getSocket } from "@/lib/socket-client";
 
 type Agent = {
   id: string;

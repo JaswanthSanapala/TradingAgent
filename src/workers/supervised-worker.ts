@@ -1,8 +1,9 @@
-import { Worker, Job } from 'bullmq';
-import { connection, SupervisedJobData } from '@/lib/queue';
+import { Job,Worker } from 'bullmq';
+
 import { prisma } from '@/lib/db';
-import { trainSupervised, trainWalkForward } from '@/lib/supervised-trainer';
 import { createLogger } from '@/lib/logger';
+import { connection, SupervisedJobData } from '@/lib/queue';
+import { trainSupervised, trainWalkForward } from '@/lib/ml/supervised-trainer';
 
 const log = createLogger('SupervisedWorker');
 

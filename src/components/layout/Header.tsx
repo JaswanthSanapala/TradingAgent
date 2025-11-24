@@ -1,10 +1,11 @@
 "use client";
 
+import { Bot, Moon,Sun } from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Bot, Sun, Moon } from "lucide-react";
-import { Button } from "@/components/ui/button";
 import { useTheme } from "next-themes";
+
+import { Button } from "@/components/ui/button";
 
 const menuItems = [
   { id: "overview", label: "Overview", href: "/" },

@@ -9,7 +9,7 @@ export async function loadLatestCheckpoint(path: string): Promise<tft.LayersMode
 export async function inferAction(model: tft.LayersModel, state: Float32Array, window: number, mask?: boolean[]) {
   const x = tf.tensor(state, [window, 9]).expandDims(0);
   const [logitsT] = model.predict(x) as tft.Tensor[];
-  let logits = await logitsT.array() as number[][];
+  const logits = await logitsT.array() as number[][];
   const l = logits[0].slice();
   if (mask && mask.length === l.length) {
     for (let i = 0; i < l.length; i++) if (!mask[i]) l[i] = -1e9;

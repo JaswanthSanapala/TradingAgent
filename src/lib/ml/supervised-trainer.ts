@@ -20,17 +20,18 @@ async function getSmcFeatures(strategyId: string): Promise<string[] | undefined>
   } catch {}
   return undefined;
 }
-import path from 'path';
+import { buildMtfWindow } from '@lib/market/mtf';
+import { buildFeatures, buildFeaturesFromSpec } from '@lib/ml/ml-utils';
+import { promote, prune,registerArtifact } from '@lib/ml/model-registry';
+import type { StrategyAction,StrategySource } from '@lib/strategy/strategy-provider';
+import { TsPluginStrategyProvider } from '@lib/strategy/strategy-ts-plugin';
+import { BacktestEngine } from '@lib/trading/backtest-engine';
 import fs from 'fs';
+import path from 'path';
+
 import { prisma } from '@/lib/db';
-import type { StrategySource, StrategyAction } from '@/lib/strategy-provider';
-import { TsPluginStrategyProvider } from '@/lib/strategy-ts-plugin';
-import { BacktestEngine } from '@/lib/backtest-engine';
-import { buildFeatures, buildFeaturesFromSpec } from '@/lib/ml-utils';
-import { buildMtfWindow } from '@/lib/mtf';
-import { computeSmcFlagsForSlice } from '@/lib/smc';
-import { registerArtifact, promote, prune } from '@/lib/model-registry';
 import { makeSupervisedMetrics } from '@/lib/metrics';
+import { computeSmcFlagsForSlice } from '@/lib/smc';
 
 // Helper: read MTF timeframes from Strategy.parameters.compiled.metadata.mtf.timeframes
 async function getMtfTimeframes(strategyId: string): Promise<string[] | undefined> {

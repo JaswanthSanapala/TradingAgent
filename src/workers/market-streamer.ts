@@ -1,9 +1,9 @@
+import { fetchOHLCV,getTickerPrice } from '@/lib/broker';
 import { CONFIG } from '@/lib/config';
-import { createLogger } from '@/lib/logger';
-import { getTickerPrice, fetchOHLCV } from '@/lib/broker';
-import { socketBus } from '@/lib/socket-bus';
 import { prisma } from '@/lib/db';
-import { predictForAgent } from '@/lib/predictor';
+import { createLogger } from '@/lib/logger';
+import { predictForAgent } from '@/lib/ml/predictor';
+import { socketBus } from '@/lib/socket-bus';
 
 const log = createLogger('MarketStreamer');
 
