@@ -1,8 +1,8 @@
-import { fetchOrder } from '@/lib/broker';
-import { CONFIG } from '@/lib/config';
-import { prisma } from '@/lib/db';
-import { createLogger } from '@/lib/logger';
-import { socketBus } from '@/lib/socket-bus';
+import { fetchOrder } from '@/lib/trading/broker';
+import { CONFIG } from '@/lib/core/config';
+import { prisma } from '@/lib/core/db';
+import { createLogger } from '@/lib/core/logger';
+import { socketBus } from '@/lib/sockets/socket-bus';
 
 const log = createLogger('OrderPoller');
 

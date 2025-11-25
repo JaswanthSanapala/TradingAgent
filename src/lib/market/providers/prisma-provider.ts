@@ -1,4 +1,4 @@
-import { prisma } from '@/lib/db'
+import { prisma } from '@/lib/core/db'
 import { Candle,Instrument, MarketProvider } from '@/lib/market/interfaces'
 
 export class PrismaMarketProvider implements MarketProvider {

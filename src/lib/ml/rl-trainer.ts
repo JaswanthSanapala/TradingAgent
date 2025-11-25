@@ -3,7 +3,7 @@ let tf: any;
 try { tf = require('@tensorflow/tfjs-node'); } catch { tf = require('@tensorflow/tfjs'); }
 import { existsSync,mkdirSync } from 'fs';
 
-import { socketBus, TRAIN_PROGRESS_EVENT } from '@/lib/socket-bus';
+import { socketBus, TRAIN_PROGRESS_EVENT } from '@/lib/sockets/socket-bus';
 
 import { Action,EnvConfig, TradingEnv } from './rl-env';
 

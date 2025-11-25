@@ -1,8 +1,8 @@
 import { Job,Worker } from 'bullmq';
 
-import { prisma } from '@/lib/db';
+import { prisma } from '@/lib/core/db';
 import { exportToParquet } from '@/lib/data/exporter';
-import { connection, ExportJobData } from '@/lib/queue';
+import { connection, ExportJobData } from '@/lib/trading/queue';
 
 export function startDataExportWorker() {
   const worker = new Worker<ExportJobData>(

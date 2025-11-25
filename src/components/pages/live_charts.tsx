@@ -9,7 +9,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
-import { getSocket } from '@/lib/socket-client';
+import { getSocket } from '@/lib/sockets/socket-client';
 
 type Agent = { id: string; name: string; strategyId: string; algorithm: string; };
 

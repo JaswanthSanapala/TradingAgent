@@ -1,12 +1,12 @@
-import { compileStrategy } from '@lib/strategy/strategy-compiler'
+import { compileStrategy } from '@/lib/strategy/strategy-compiler'
 import { Job,Worker } from 'bullmq'
 import fs from 'fs/promises'
 
-import { CONFIG } from '@/lib/config'
-import { prisma } from '@/lib/db'
+import { CONFIG } from '@/lib/core/config'
+import { prisma } from '@/lib/core/db'
 import { convertFileToText } from '@/lib/ingest/converters'
 import { extractSpecFromText } from '@/lib/ingest/spec-extractor'
-import { connection } from '@/lib/queue'
+import { connection } from '@/lib/trading/queue'
 
 export type IngestionJobData = {
   name: string

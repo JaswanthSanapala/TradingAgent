@@ -1,7 +1,7 @@
 import { NextRequest } from "next/server";
 
-import { CONFIG } from '@/lib/config';
-import { classifyNews } from "@/lib/news-agent";
+import { CONFIG } from '@/lib/core/config';
+import { classifyNews } from "@/lib/data/news-agent";
 
 export interface NewsItem {
   id: string;

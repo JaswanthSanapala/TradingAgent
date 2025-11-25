@@ -1,4 +1,4 @@
-import { logger } from '@/lib/logger';
+import { logger } from '@/lib/core/logger';
 
 export interface IndicatorResult {
   atr?: number;
@@ -187,7 +187,7 @@ export class TechnicalIndicators {
       if (current === Math.max(...slice)) {
         result.push(current);
       } else {
-        result.push(null);
+        result.push(Number.NaN);
       }
     }
     
@@ -204,7 +204,7 @@ export class TechnicalIndicators {
       if (current === Math.min(...slice)) {
         result.push(current);
       } else {
-        result.push(null);
+        result.push(Number.NaN);
       }
     }
     

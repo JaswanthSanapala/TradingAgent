@@ -2,7 +2,7 @@ import { mkdir, unlink,writeFile } from 'fs/promises';
 import { NextRequest, NextResponse } from 'next/server';
 import path from 'path';
 
-import { prisma } from '@/lib/db';
+import { prisma } from '@/lib/core/db';
 
 export async function PUT(
   request: NextRequest,

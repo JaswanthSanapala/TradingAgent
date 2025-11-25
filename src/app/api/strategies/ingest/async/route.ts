@@ -2,8 +2,8 @@ import { mkdir, writeFile } from 'fs/promises'
 import { NextRequest, NextResponse } from 'next/server'
 import path from 'path'
 
-import { CONFIG } from '@/lib/config'
-import { defaultJobOpts,queues } from '@/lib/queue'
+import { CONFIG } from '@/lib/core/config'
+import { defaultJobOpts,queues } from '@/lib/trading/queue'
 
 export const dynamic = 'force-dynamic'
 

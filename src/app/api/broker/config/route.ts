@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 
-import { reloadBroker } from '@/lib/broker';
-import { prisma } from '@/lib/db';
+import { reloadBroker } from '@/lib/trading/broker';
+import { prisma } from '@/lib/core/db';
 
 export const dynamic = 'force-dynamic';
 

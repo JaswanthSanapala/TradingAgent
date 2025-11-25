@@ -3,10 +3,10 @@ import { buildRuntimeFromSpec } from '@lib/strategy/strategy-runtime';
 import fs from 'fs';
 import path from 'path';
 
-import { prisma } from '@/lib/db';
-import { logger } from '@/lib/logger';
+import { prisma } from '@/lib/core/db';
+import { logger } from '@/lib/core/logger';
 import { MarketRegistry } from '@/lib/market/registry';
-import { buildMtfWindow } from '@/lib/mtf';
+import { buildMtfWindow } from '@/lib/market/mtf';
 
 export interface BacktestConfig {
   startDate: Date;

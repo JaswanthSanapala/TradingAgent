@@ -5,7 +5,7 @@ import { mkdir,writeFile } from 'fs/promises';
 import { NextRequest, NextResponse } from 'next/server';
 import path from 'path';
 
-import { prisma } from '@/lib/db';
+import { prisma } from '@/lib/core/db';
 
 export const dynamic = 'force-dynamic';
 

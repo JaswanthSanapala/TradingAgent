@@ -5,11 +5,11 @@ import { createServer } from 'http';
 import next from 'next';
 import { Server } from 'socket.io';
 
-import { CONFIG } from '@/lib/config';
+import { CONFIG } from '@/lib/core/config';
 import { PrismaMarketProvider } from '@/lib/market/providers/prisma-provider';
 import { MarketRegistry } from '@/lib/market/registry';
-import { startScheduler } from '@/lib/scheduler';
-import { setupSocket } from '@/lib/socket';
+import { startScheduler } from '@/lib/trading/scheduler';
+import { setupSocket } from '@/lib/sockets/socket';
 import { scheduleCoverageTick,startCoverageWorker } from '@/workers/coverage-worker';
 import { startDataBackfillWorker } from '@/workers/data-backfill-worker';
 import { startDataExportWorker } from '@/workers/data-export-worker';

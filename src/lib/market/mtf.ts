@@ -1,5 +1,5 @@
-import { prisma } from '@/lib/db';
-import { computeSmcFlagsForSlice } from '@/lib/smc';
+import { prisma } from '@/lib/core/db';
+import { computeSmcFlagsForSlice } from '@/lib/strategy/smc';
 
 export type Ohlcv = { timestamp: Date; open: number; high: number; low: number; close: number; volume: number };
 

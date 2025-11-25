@@ -1,8 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 
-import { prisma } from '@/lib/db';
-import { predictForAgent } from '@/lib/predictor';
-import { inferAction,loadLatestCheckpoint } from '@/lib/rl-infer';
+import { prisma } from '@/lib/core/db';
+import { predictForAgent } from '@/lib/ml/predictor';
+import { inferAction,loadLatestCheckpoint } from '@/lib/ml/rl-infer';
 
 export const dynamic = 'force-dynamic';
 

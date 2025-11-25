@@ -2,12 +2,8 @@ import { buildMtfWindow, pickBaseTimeframe } from '@lib/market/mtf';
 import { predictAction } from '@lib/ml/ml-utils';
 import { PREDICTION_CREATED_EVENT,socketBus } from '@lib/sockets/socket-bus';
 import { maybeAutoTrade } from '@lib/trading/auto-trader';
+import { prisma } from '@/lib/core/db';
 
-import { prisma } from '@/lib/db';
-
-// buildFeatures imported from '@/lib/ml-utils'
-
-// Helper: read MTF timeframes from Strategy.parameters.compiled.metadata.mtf.timeframes
 async function getMtfTimeframes(strategyId: string): Promise<string[] | undefined> {
   try {
     const s = await prisma.strategy.findUnique({ where: { id: strategyId }, select: { parameters: true } });

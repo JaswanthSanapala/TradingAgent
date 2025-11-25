@@ -1,9 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server';
 
-import { prisma } from '@/lib/db';
-import { EnvConfig } from '@/lib/rl-env';
-import { PPOHyperParams,PPOTrainer } from '@/lib/rl-trainer';
-import { trainSupervised, trainWalkForward, tuneSupervised } from '@/lib/supervised-trainer';
+import { prisma } from '@/lib/core/db';
+import { EnvConfig } from '@/lib/ml/rl-env';
+import { PPOHyperParams,PPOTrainer } from '@/lib/ml/rl-trainer';
+import { trainSupervised, trainWalkForward, tuneSupervised } from '@/lib/ml/supervised-trainer';
 
 export const dynamic = 'force-dynamic';
 

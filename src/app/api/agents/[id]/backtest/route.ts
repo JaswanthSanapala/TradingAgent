@@ -1,8 +1,8 @@
 import { BacktestConfig,BacktestEngine } from '@lib/trading/backtest-engine';
 import { NextRequest, NextResponse } from 'next/server';
 
-import { prisma } from '@/lib/db';
-import { logger } from '@/lib/logger';
+import { prisma } from '@/lib/core/db';
+import { logger } from '@/lib/core/logger';
 
 export const dynamic = 'force-dynamic';
 

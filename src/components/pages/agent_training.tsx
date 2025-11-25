@@ -15,7 +15,7 @@ import { Label } from "@/components/ui/label";
 import { Progress } from "@/components/ui/progress";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Tabs, TabsContent } from "@/components/ui/tabs";
-import { getSocket } from "@/lib/socket-client";
+import { getSocket } from "@/lib/sockets/socket-client";
 
 type Agent = {
   id: string;

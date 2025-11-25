@@ -51,3 +51,6 @@ server.log
 /db
 /uploads
 /docs
+
+#lint
+/eslint-report.json

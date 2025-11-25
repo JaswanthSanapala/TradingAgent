@@ -1,7 +1,7 @@
-import { getBalance, getTickerPrice } from '@/lib/broker';
-import { CONFIG } from '@/lib/config';
-import { queues } from '@/lib/queue';
-import { simpleSizeByQuote } from '@/lib/risk';
+import { getBalance, getTickerPrice } from '@/lib/trading/broker';
+import { CONFIG } from '@/lib/core/config';
+import { queues } from '@/lib/trading/queue';
+import { simpleSizeByQuote } from '@/lib/trading/risk';
 
 function toCcxtSymbol(dbSymbol: string): string {
   // 'BTC_USDT' -> 'BTC/USDT'

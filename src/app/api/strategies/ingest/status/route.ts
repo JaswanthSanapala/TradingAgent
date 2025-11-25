@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 
-import { CONFIG } from '@/lib/config'
-import { queues } from '@/lib/queue'
+import { CONFIG } from '@/lib/core/config'
+import { queues } from '@/lib/trading/queue'
 
 export const dynamic = 'force-dynamic'
 

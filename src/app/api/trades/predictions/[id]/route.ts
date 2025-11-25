@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 
-import { prisma } from '@/lib/db';
-import { PREDICTION_UPDATED_EVENT, socketBus, TRADE_CREATED_EVENT } from '@/lib/socket-bus';
+import { prisma } from '@/lib/core/db';
+import { PREDICTION_UPDATED_EVENT, socketBus, TRADE_CREATED_EVENT } from '@/lib/sockets/socket-bus';
 
 export const dynamic = 'force-dynamic';
 
@@ -71,6 +71,7 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
       data: {
         agentId: prediction.agentId,
         strategyId: prediction.strategyId,
+        symbol: prediction.symbol,
         entryTime: prediction.timestamp,
         entryPrice: entryPrice,
         stopLoss: stopLoss,

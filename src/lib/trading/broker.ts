@@ -1,7 +1,7 @@
 import ccxt from 'ccxt';
 
-import { CONFIG } from '@/lib/config';
-import { prisma } from '@/lib/db';
+import { CONFIG } from '@/lib/core/config';
+import { prisma } from '@/lib/core/db';
 
 let exchange: any | null = null;
 let cachedCfg: { provider: string; apiKey?: string | null; apiSecret?: string | null; sandbox?: boolean | null } | null = null;
@@ -126,7 +126,7 @@ export async function placeOcoOrder(opts: { symbol: string; side: 'buy'|'sell'; 
 // Fetch recent OHLCV candles for a symbol/timeframe
 // Returns array of [timestamp, open, high, low, close, volume]
 export async function fetchOHLCV(symbol: string, timeframe: string, limit: number = 2): Promise<number[][]> {
-  const ex = getExchange();
+  const ex = await getExchange();
   // ccxt standard fetchOHLCV
   const candles: any[] = await ex.fetchOHLCV(symbol, timeframe, undefined, limit);
   return candles as number[][];

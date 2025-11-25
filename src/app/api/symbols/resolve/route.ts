@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 
-import { autoResolveSymbol,resolveSymbol } from '@/lib/symbols';
+import { autoResolveSymbol,resolveSymbol } from '@/lib/market/symbols';
 
 export const dynamic = 'force-dynamic';
 

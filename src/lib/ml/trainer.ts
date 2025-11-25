@@ -3,8 +3,8 @@ import fs from 'fs';
 import fsp from 'fs/promises';
 import path from 'path';
 let tf: any; try { tf = require('@tensorflow/tfjs-node'); } catch { tf = require('@tensorflow/tfjs'); }
-import { logger } from '@/lib/logger';
-import { socketBus, TRAIN_PROGRESS_EVENT } from '@/lib/socket-bus';
+import { logger } from '@/lib/core/logger';
+import { socketBus, TRAIN_PROGRESS_EVENT } from '@/lib/sockets/socket-bus';
 
 export interface TrainParams {
   symbol: string;

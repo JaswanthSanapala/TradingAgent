@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 
-import { prisma } from '@/lib/db';
-import { getAggregateSuggestions } from '@/lib/strategy-suggester';
+import { prisma } from '@/lib/core/db';
+import { getAggregateSuggestions } from '@/lib/strategy/strategy-suggester';
 
 export const dynamic = 'force-dynamic';
 

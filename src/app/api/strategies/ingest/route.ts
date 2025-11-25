@@ -1,8 +1,6 @@
 import type { Prisma } from '@prisma/client'
 import { NextRequest, NextResponse } from 'next/server'
-import path from 'path'
-
-import { prisma } from '@/lib/db'
+import { prisma } from '@/lib/core/db'
 import { convertFileToText } from '@/lib/ingest/converters'
 import { extractSpecFromText } from '@/lib/ingest/spec-extractor'
 

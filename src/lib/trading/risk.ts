@@ -1,4 +1,4 @@
-import { CONFIG } from '@/lib/config';
+import { CONFIG } from '@/lib/core/config';
 
 export type SizingInput = {
   quoteBalance: number;        // e.g., USDT balance available

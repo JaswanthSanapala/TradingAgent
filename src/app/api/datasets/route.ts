@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 
-import { prisma } from '@/lib/db';
-import { autoResolveSymbol, isYahooIndexStorageSymbol,resolveSymbol } from '@/lib/symbols';
+import { prisma } from '@/lib/core/db';
+import { autoResolveSymbol, isYahooIndexStorageSymbol,resolveSymbol } from '@/lib/market/symbols';
 
 export const dynamic = 'force-dynamic';
 

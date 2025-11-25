@@ -1,4 +1,4 @@
-import { Ohlcv } from '@/lib/mtf';
+import { Ohlcv } from '@/lib/market/mtf';
 
 export type SmcOptions = {
   // Optional per-step indicator rows aligned to sliceBase timestamps

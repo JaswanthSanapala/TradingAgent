@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 let tf: any; try { tf = require('@tensorflow/tfjs-node'); } catch { tf = require('@tensorflow/tfjs'); }
-import { EnvConfig,TradingEnv } from '@/lib/rl-env';
-import { inferAction,loadLatestCheckpoint } from '@/lib/rl-infer';
+import { EnvConfig,TradingEnv } from '@/lib/ml/rl-env';
+import { inferAction,loadLatestCheckpoint } from '@/lib/ml/rl-infer';
 
 export const dynamic = 'force-dynamic';
 

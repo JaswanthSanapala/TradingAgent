@@ -1,4 +1,4 @@
-import { prisma } from '@/lib/db';
+import { prisma } from '@/lib/core/db';
 
 export type Suggestion = { path: string; op: 'set' | 'inc' | 'dec'; value: number; rationale: string; confidence: number };
 

@@ -29,9 +29,8 @@ import { BacktestEngine } from '@lib/trading/backtest-engine';
 import fs from 'fs';
 import path from 'path';
 
-import { prisma } from '@/lib/db';
-import { makeSupervisedMetrics } from '@/lib/metrics';
-import { computeSmcFlagsForSlice } from '@/lib/smc';
+import { prisma } from '@/lib/core/db';
+import { makeSupervisedMetrics } from '@/lib/trading/metrics';
 
 // Helper: read MTF timeframes from Strategy.parameters.compiled.metadata.mtf.timeframes
 async function getMtfTimeframes(strategyId: string): Promise<string[] | undefined> {

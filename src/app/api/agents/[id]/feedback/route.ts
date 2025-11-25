@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 
-import { prisma } from '@/lib/db';
-import { analyzeStopLossAndTiming } from '@/lib/sl-analyzer';
+import { prisma } from '@/lib/core/db';
+import { analyzeStopLossAndTiming } from '@/lib/trading/sl-analyzer';
 
 export const dynamic = 'force-dynamic';
 

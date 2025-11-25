@@ -1,10 +1,7 @@
 import { compileStrategy } from '@lib/strategy/strategy-compiler';
 import { defaultJobOpts, queues, SupervisedJobData } from '@lib/trading/queue';
 import { NextRequest, NextResponse } from 'next/server';
-
-import { prisma } from '@/lib/db';
-
-// Durable job queue is used now; remove in-memory tracker
+import { prisma } from '@/lib/core/db';
 
 export const dynamic = 'force-dynamic';
 

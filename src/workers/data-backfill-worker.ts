@@ -1,9 +1,9 @@
 import { Job,Worker } from 'bullmq';
 
-import { CONFIG } from '@/lib/config';
-import { DataPipeline } from '@/lib/data-pipeline';
-import { prisma } from '@/lib/db';
-import { BackfillJobData,connection } from '@/lib/queue';
+import { CONFIG } from '@/lib/core/config';
+import { DataPipeline } from '@/lib/data/data-pipeline';
+import { prisma } from '@/lib/core/db';
+import { BackfillJobData,connection } from '@/lib/trading/queue';
 
 export function startDataBackfillWorker() {
   const worker = new Worker<BackfillJobData>(

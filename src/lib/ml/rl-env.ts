@@ -1,4 +1,4 @@
-import { prisma } from '@/lib/db';
+import { prisma } from '@/lib/core/db';
 
 export type Action = 0 | 1 | 2 | 3; // 0: hold, 1: buy/open long, 2: sell/open short, 3: close
 
